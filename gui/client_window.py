@@ -1,8 +1,3 @@
-"""
-Kriptoloji Projesi - Client Arayüzü
-Client tarafı GUI arayüzü
-"""
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 import threading
@@ -10,15 +5,12 @@ import os
 import sys
 from datetime import datetime
 
-# Üst dizindeki modülleri import edebilmek için path'e ekle
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.client import EncryptionClient
 
 
-class ClientWindow:
-    """Client arayüzü"""
-    
+class ClientWindow:    
     def __init__(self, root):
         self.root = root
         self.client = EncryptionClient()
@@ -29,23 +21,18 @@ class ClientWindow:
         self.create_widgets()
         
     def setup_window(self):
-        """Pencere ayarlarını yap"""
         self.root.title("Kriptoloji Client")
         self.root.geometry("1200x800")
         self.root.minsize(1000, 700)
         
-        # Basit tema
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Pencere arka planı
         self.root.configure(bg='#f5f5f5')
         
-        # Pencere kapatma olayı
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
     def on_closing(self):
-        """Pencere kapatılırken temizlik"""
         try:
             if self.client.is_connected:
                 self.client.disconnect()
@@ -54,12 +41,9 @@ class ClientWindow:
         self.root.destroy()
         
     def create_widgets(self):
-        """Widget'ları oluştur"""
-        # Ana container
         main_frame = tk.Frame(self.root, bg='#f5f5f5', padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Başlık
         title_label = tk.Label(
             main_frame,
             text="Kriptoloji Client",
@@ -69,27 +53,20 @@ class ClientWindow:
         )
         title_label.pack(pady=(0, 20))
         
-        # Bağlantı kontrolü
         self.create_connection_panel(main_frame)
         
-        # Ana içerik - 4 panel
         content_frame = tk.Frame(main_frame, bg='#f5f5f5')
         content_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         
-        # Sol panel - Şifreleme ayarları
         self.create_encryption_panel(content_frame)
         
-        # Orta panel - Veri girişi
         self.create_data_panel(content_frame)
         
-        # Sağ panel - Dosya yönetimi
         self.create_file_management_panel(content_frame)
         
-        # Alt panel - Sonuçlar ve loglar
         self.create_results_panel(main_frame)
         
     def create_connection_panel(self, parent):
-        """Bağlantı kontrol panelini oluştur"""
         connection_frame = tk.LabelFrame(
             parent,
             text="Server Bağlantısı",
@@ -102,21 +79,18 @@ class ClientWindow:
         connection_inner = tk.Frame(connection_frame, bg='#f5f5f5')
         connection_inner.pack(fill=tk.X, padx=15, pady=15)
         
-        # Host girişi
         tk.Label(connection_inner, text="Host:", font=('Arial', 11), bg='#f5f5f5').pack(side=tk.LEFT)
         
         self.host_var = tk.StringVar(value="127.0.0.1")
         host_entry = tk.Entry(connection_inner, textvariable=self.host_var, width=15, font=('Arial', 11))
         host_entry.pack(side=tk.LEFT, padx=(5, 15))
         
-        # Port girişi
         tk.Label(connection_inner, text="Port:", font=('Arial', 11), bg='#f5f5f5').pack(side=tk.LEFT)
         
         self.port_var = tk.StringVar(value="8080")
         port_entry = tk.Entry(connection_inner, textvariable=self.port_var, width=8, font=('Arial', 11))
         port_entry.pack(side=tk.LEFT, padx=(5, 15))
         
-        # Bağlan/Bağlantıyı kes butonu
         self.connection_button = tk.Button(
             connection_inner,
             text="Bağlan",
@@ -130,7 +104,6 @@ class ClientWindow:
         )
         self.connection_button.pack(side=tk.LEFT, padx=(0, 15))
         
-        # Durum göstergesi
         self.connection_status = tk.Label(
             connection_inner,
             text="Bağlı değil",
@@ -141,7 +114,6 @@ class ClientWindow:
         self.connection_status.pack(side=tk.LEFT)
         
     def create_encryption_panel(self, parent):
-        """Şifreleme ayarları panelini oluştur"""
         encryption_frame = tk.LabelFrame(
             parent,
             text="Şifreleme Ayarları",
@@ -151,7 +123,6 @@ class ClientWindow:
         )
         encryption_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        # Algoritma seçimi
         tk.Label(encryption_frame, text="Algoritma:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.algorithm_var = tk.StringVar(value="caesar")
@@ -165,14 +136,11 @@ class ClientWindow:
         algorithm_combo.pack(fill=tk.X, padx=10, pady=(0, 10))
         algorithm_combo.bind('<<ComboboxSelected>>', self.on_algorithm_changed)
         
-        # Parametreler frame
         self.params_frame = tk.Frame(encryption_frame, bg='#f5f5f5')
         self.params_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
-        # Caesar parametreleri (varsayılan)
         self.create_caesar_params()
         
-        # İşlem türü seçimi
         tk.Label(encryption_frame, text="İşlem Türü:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.operation_var = tk.StringVar(value="encrypt")
@@ -197,7 +165,6 @@ class ClientWindow:
             bg='#f5f5f5'
         ).pack(side=tk.LEFT)
         
-        # Veri türü seçimi
         tk.Label(encryption_frame, text="Veri Türü:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.data_type_var = tk.StringVar(value="text")
@@ -223,7 +190,6 @@ class ClientWindow:
         ).pack(side=tk.LEFT)
         
     def create_data_panel(self, parent):
-        """Veri girişi panelini oluştur"""
         data_frame = tk.LabelFrame(
             parent,
             text="Veri Girişi",
@@ -233,7 +199,6 @@ class ClientWindow:
         )
         data_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        # Dosya seçimi (dosya modu için)
         file_frame = tk.Frame(data_frame, bg='#f5f5f5')
         file_frame.pack(fill=tk.X, padx=10, pady=10)
         
@@ -252,7 +217,6 @@ class ClientWindow:
             padx=15
         ).pack(side=tk.RIGHT)
         
-        # Metin girişi
         tk.Label(data_frame, text="Metin:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.text_input = scrolledtext.ScrolledText(
@@ -263,7 +227,6 @@ class ClientWindow:
         )
         self.text_input.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
-        # İşlem butonları
         button_frame = tk.Frame(data_frame, bg='#f5f5f5')
         button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
@@ -291,7 +254,6 @@ class ClientWindow:
         ).pack(side=tk.RIGHT)
         
     def create_file_management_panel(self, parent):
-        """Dosya yönetimi panelini oluştur"""
         file_frame = tk.LabelFrame(
             parent,
             text="Dosya Yönetimi",
@@ -301,10 +263,8 @@ class ClientWindow:
         )
         file_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        # Dosya listesi
         tk.Label(file_frame, text="Server'daki Dosyalar:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
-        # Dosya listesi ve scrollbar
         list_frame = tk.Frame(file_frame, bg='#f5f5f5')
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
@@ -318,12 +278,10 @@ class ClientWindow:
         )
         self.file_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Scrollbar
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.file_listbox.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.file_listbox.config(yscrollcommand=scrollbar.set)
         
-        # Dosya işlem butonları
         file_button_frame = tk.Frame(file_frame, bg='#f5f5f5')
         file_button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
@@ -371,7 +329,6 @@ class ClientWindow:
             padx=10
         ).pack(side=tk.RIGHT)
         
-        # Dosya bilgisi alanı
         tk.Label(file_frame, text="Seçili Dosya Bilgisi:", font=('Arial', 11), bg='#f5f5f5').pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.file_info_text = tk.Text(
@@ -385,10 +342,8 @@ class ClientWindow:
         )
         self.file_info_text.pack(fill=tk.X, padx=10, pady=(0, 10))
         
-        # Dosya listesi seçim olayı
         self.file_listbox.bind('<<ListboxSelect>>', self.on_file_selected)
         
-        # Başlangıçta dosya listesini yükle
         self.server_files = []
         
     def create_results_panel(self, parent):
@@ -402,7 +357,6 @@ class ClientWindow:
         )
         results_frame.pack(fill=tk.X, pady=(10, 0))
         
-        # Sonuç alanı
         self.results_text = scrolledtext.ScrolledText(
             results_frame,
             font=('Consolas', 11),
@@ -413,7 +367,6 @@ class ClientWindow:
         )
         self.results_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Sonuç kontrol butonları
         result_button_frame = tk.Frame(results_frame, bg='#f5f5f5')
         result_button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
@@ -440,8 +393,6 @@ class ClientWindow:
         ).pack(side=tk.RIGHT)
         
     def create_caesar_params(self):
-        """Caesar parametrelerini oluştur"""
-        # Önceki parametreleri temizle
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         
@@ -452,7 +403,6 @@ class ClientWindow:
         shift_entry.pack(anchor=tk.W, pady=(5, 0))
         
     def create_vigenere_params(self):
-        """Vigenere parametrelerini oluştur"""
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         
@@ -463,7 +413,6 @@ class ClientWindow:
         keyword_entry.pack(anchor=tk.W, pady=(5, 0))
         
     def create_affine_params(self):
-        """Affine parametrelerini oluştur"""
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         
@@ -478,7 +427,6 @@ class ClientWindow:
         b_entry.pack(anchor=tk.W, pady=(5, 0))
         
     def create_substitution_params(self):
-        """Substitution parametrelerini oluştur"""
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         
@@ -500,7 +448,6 @@ class ClientWindow:
         ).pack(anchor=tk.W, pady=(10, 0))
         
     def create_rail_fence_params(self):
-        """Rail Fence parametrelerini oluştur"""
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         
@@ -511,7 +458,6 @@ class ClientWindow:
         rails_entry.pack(anchor=tk.W, pady=(5, 0))
         
     def on_algorithm_changed(self, event=None):
-        """Algoritma değiştiğinde parametreleri güncelle"""
         algorithm = self.algorithm_var.get()
         
         if algorithm == "caesar":
@@ -537,10 +483,8 @@ class ClientWindow:
             def connect_thread():
                 success = self.client.connect(host, port, retry_callback)
                 
-                # UI güncellemeleri ana thread'de yapılmalı
                 self.root.after(0, lambda: self.update_connection_status(success))
             
-            # Bağlantıyı ayrı thread'de yap
             threading.Thread(target=connect_thread, daemon=True).start()
         else:
             self.client.disconnect()
@@ -552,13 +496,11 @@ class ClientWindow:
             self.connection_button.config(text="Bağlantıyı Kes", bg='#f44336')
             self.connection_status.config(text="Bağlı", fg='#4CAF50')
             self.add_log(f"Server'a bağlandı: {self.host_var.get()}:{self.port_var.get()}")
-            # Bağlantı kurulduğunda dosya listesini yükle
             self.refresh_file_list()
         else:
             self.connection_button.config(text="Bağlan", bg='#4CAF50')
             self.connection_status.config(text="Bağlı değil", fg='#f44336')
             self.add_log("Server bağlantısı kesildi")
-            # Bağlantı kesildiğinde dosya listesini temizle
             self.file_listbox.delete(0, tk.END)
             self.server_files = []
             
@@ -615,7 +557,6 @@ class ClientWindow:
         def operation_thread():
             try:
                 if data_type == "text":
-                    # Metin işlemi
                     text = self.text_input.get("1.0", tk.END).strip()
                     if not text:
                         self.root.after(0, lambda: messagebox.showerror("Hata", "Metin girişi boş olamaz!"))
@@ -627,7 +568,6 @@ class ClientWindow:
                         result = self.client.decrypt_text(text, algorithm, **params)
                         
                 else:
-                    # Dosya işlemi
                     file_path = self.file_path_var.get()
                     if not file_path:
                         self.root.after(0, lambda: messagebox.showerror("Hata", "Dosya seçmelisiniz!"))
@@ -636,7 +576,6 @@ class ClientWindow:
                     if operation == "encrypt":
                         result = self.client.encrypt_file(file_path, algorithm, **params)
                     else:
-                        # Çözme işlemi için önce şifrelenmiş veri olmalı
                         if not self.current_encrypted_data:
                             self.root.after(0, lambda: messagebox.showerror("Hata", "Önce bir dosyayı şifreleyin!"))
                             return
@@ -648,18 +587,15 @@ class ClientWindow:
                         if output_path:
                             result = self.client.decrypt_file(self.current_encrypted_data, algorithm, output_path, **params)
                 
-                # Sonucu göster
                 self.root.after(0, lambda: self.show_result(result, operation, data_type))
                 
             except Exception as e:
                 self.root.after(0, lambda: self.add_log(f"İşlem hatası: {str(e)}"))
         
-        # İşlemi ayrı thread'de çalıştır
         threading.Thread(target=operation_thread, daemon=True).start()
         self.add_log(f"{operation.capitalize()} işlemi başlatıldı...")
         
     def show_result(self, result, operation, data_type):
-        """Sonucu göster"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         if result['success']:
@@ -669,11 +605,9 @@ class ClientWindow:
                     self.add_log(f"[{timestamp}] Şifreleme başarılı!")
                     self.add_log(f"Şifrelenmiş metin:\n{encrypted_text}")
                     
-                    # Sonucu metin alanına kopyala
                     self.text_input.delete("1.0", tk.END)
                     self.text_input.insert("1.0", encrypted_text)
                     
-                    # Server'a kaydetme seçeneği sun
                     if messagebox.askyesno("Kaydet", "Şifrelenmiş metni server'a kaydetmek ister misiniz?"):
                         self.save_encrypted_to_server(encrypted_text, algorithm, params, "text_encrypted.txt")
                     
@@ -682,7 +616,6 @@ class ClientWindow:
                     self.add_log(f"[{timestamp}] Çözme başarılı!")
                     self.add_log(f"Çözülmüş metin:\n{decrypted_text}")
                     
-                    # Sonucu metin alanına kopyala
                     self.text_input.delete("1.0", tk.END)
                     self.text_input.insert("1.0", decrypted_text)
                     
@@ -692,7 +625,6 @@ class ClientWindow:
                     self.add_log(f"[{timestamp}] Dosya şifreleme başarılı!")
                     self.add_log(f"Şifrelenmiş veri boyutu: {len(result['encrypted_data'])} karakter")
                     
-                    # Server'a kaydetme seçeneği sun
                     if messagebox.askyesno("Kaydet", "Şifrelenmiş dosyayı server'a kaydetmek ister misiniz?"):
                         original_filename = os.path.basename(self.file_path_var.get()) if self.file_path_var.get() else "encrypted_file.dat"
                         self.save_encrypted_to_server(result['encrypted_data'], algorithm, params, original_filename)
@@ -840,7 +772,6 @@ ID: {file_info['file_id']}"""
     def handle_download_result(self, result, file_info):
         """İndirme sonucunu işle"""
         if result['success']:
-            # Dosyayı kaydet
             filename = filedialog.asksaveasfilename(
                 title="Şifrelenmiş Dosyayı Kaydet",
                 initialvalue=file_info['filename'],
@@ -876,7 +807,6 @@ ID: {file_info['file_id']}"""
         
         file_info = self.server_files[index]
         
-        # Onay al
         if not messagebox.askyesno("Onay", f"Dosyayı silmek istediğinizden emin misiniz?\n\n{file_info['filename']}"):
             return
         
@@ -891,18 +821,15 @@ ID: {file_info['file_id']}"""
         self.add_log(f"Dosya siliniyor: {file_info['filename']}")
     
     def handle_delete_result(self, result, file_info):
-        """Silme sonucunu işle"""
         if result['success']:
             self.add_log(f"Dosya silindi: {file_info['filename']}")
             messagebox.showinfo("Başarılı", "Dosya silindi!")
-            # Listeyi yenile
             self.refresh_file_list()
         else:
             self.add_log(f"Dosya silinemedi: {result['error']}")
             messagebox.showerror("Hata", f"Dosya silinemedi: {result['error']}")
     
     def show_file_info(self):
-        """Seçili dosya hakkında detaylı bilgi göster"""
         selection = self.file_listbox.curselection()
         if not selection:
             messagebox.showwarning("Uyarı", "Lütfen bir dosya seçin!")
@@ -925,7 +852,6 @@ ID: {file_info['file_id']}"""
         threading.Thread(target=info_thread, daemon=True).start()
     
     def show_detailed_file_info(self, result):
-        """Detaylı dosya bilgisini göster"""
         if result['success']:
             file_info = result['file_info']
             
@@ -934,13 +860,11 @@ ID: {file_info['file_id']}"""
             info_window.geometry("500x400")
             info_window.resizable(False, False)
             
-            # Pencereyi ortala
             info_window.update_idletasks()
             x = (info_window.winfo_screenwidth() // 2) - (500 // 2)
             y = (info_window.winfo_screenheight() // 2) - (400 // 2)
             info_window.geometry(f"500x400+{x}+{y}")
             
-            # Bilgi metni
             info_text = f"""Dosya Bilgileri
 {'='*50}
 
@@ -966,7 +890,6 @@ Algoritma Parametreleri:
             text_widget.insert("1.0", info_text)
             text_widget.config(state=tk.DISABLED)
             
-            # Kapat butonu
             tk.Button(
                 info_window,
                 text="Kapat",
@@ -983,10 +906,8 @@ Algoritma Parametreleri:
             messagebox.showerror("Hata", f"Dosya bilgisi alınamadı: {result['error']}")
     
     def save_encrypted_to_server(self, encrypted_data, algorithm, params, filename):
-        """Şifrelenmiş veriyi server'a kaydet"""
         def save_thread():
             try:
-                # Base64 encode et
                 import base64
                 encoded_data = base64.b64encode(encrypted_data.encode('utf-8') if isinstance(encrypted_data, str) else encrypted_data).decode('utf-8')
                 
@@ -999,11 +920,9 @@ Algoritma Parametreleri:
         self.add_log(f"Server'a kaydediliyor: {filename}")
     
     def handle_save_result(self, result, filename):
-        """Kaydetme sonucunu işle"""
         if result['success']:
             self.add_log(f"Dosya server'a kaydedildi: {filename} (ID: {result['file_id']})")
             messagebox.showinfo("Başarılı", f"Dosya server'a kaydedildi!\n\nDosya ID: {result['file_id']}")
-            # Dosya listesini yenile
             self.refresh_file_list()
         else:
             self.add_log(f"Server'a kaydetme başarısız: {result['error']}")
@@ -1011,7 +930,6 @@ Algoritma Parametreleri:
 
 
 def main():
-    """Ana fonksiyon"""
     root = tk.Tk()
     app = ClientWindow(root)
     root.mainloop()

@@ -7,12 +7,10 @@ import time
 import threading
 from typing import Optional, Callable
 
-# Üst dizindeki modülleri import edebilmek için path'e ekle
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class EncryptionClient:
-    """Şifreleme server'ına bağlanan client"""
     
     def __init__(self):
         self.socket = None
@@ -24,7 +22,6 @@ class EncryptionClient:
         self.retry_delay = 1.0  # saniye
         
     def connect(self, host='127.0.0.1', port=8080, retry_callback: Optional[Callable] = None):
-        """Server'a bağlan (retry desteği ile)"""
         with self.connection_lock:
             for attempt in range(self.max_retries):
                 try:
@@ -60,7 +57,6 @@ class EncryptionClient:
                         return False
             
     def disconnect(self):
-        """Server'dan bağlantıyı kes"""
         with self.connection_lock:
             try:
                 if self.socket:
@@ -74,7 +70,6 @@ class EncryptionClient:
                 print(f"Baglanti kesme hatasi: {e}")
                 
     def send_message(self, message):
-        """Server'a mesaj gönder ve yanıt al (gelişmiş protokol ile)"""
         if not self.is_connected:
             return {
                 'success': False,
@@ -82,18 +77,14 @@ class EncryptionClient:
             }
         
         try:
-            # Mesajı JSON olarak hazırla
             message_json = json.dumps(message, ensure_ascii=False)
             message_bytes = message_json.encode('utf-8')
             
-            # Mesaj uzunluğunu gönder
             length = len(message_bytes)
             self.socket.send(length.to_bytes(4, byteorder='big'))
             
-            # Mesajı gönder
             self.socket.send(message_bytes)
             
-            # Yanıt uzunluğunu al
             length_data = self.socket.recv(4)
             if not length_data:
                 return {
@@ -102,8 +93,6 @@ class EncryptionClient:
                 }
             
             length = int.from_bytes(length_data, byteorder='big')
-            
-            # Yanıtı parça parça al
             response_data = b''
             while len(response_data) < length:
                 chunk = self.socket.recv(min(length - len(response_data), 4096))
@@ -124,7 +113,6 @@ class EncryptionClient:
             }
             
     def encrypt_text(self, text, algorithm, **params):
-        """Metni şifrele"""
         message = {
             'operation': 'encrypt',
             'algorithm': algorithm,
@@ -136,7 +124,6 @@ class EncryptionClient:
         return self.send_message(message)
         
     def decrypt_text(self, encrypted_text, algorithm, **params):
-        """Şifrelenmiş metni çöz"""
         message = {
             'operation': 'decrypt',
             'algorithm': algorithm,
@@ -148,13 +135,10 @@ class EncryptionClient:
         return self.send_message(message)
     
     def encrypt_file(self, file_path, algorithm, **params):
-        """Dosyayı şifrele"""
         try:
-            # Dosyayı binary olarak oku
             with open(file_path, 'rb') as f:
                 file_data = f.read()
             
-            # Base64 encode et
             encoded_data = base64.b64encode(file_data).decode('utf-8')
             
             message = {
@@ -175,7 +159,6 @@ class EncryptionClient:
             }
     
     def decrypt_file(self, encrypted_data, algorithm, output_path, **params):
-        """Şifrelenmiş dosyayı çöz ve kaydet"""
         message = {
             'operation': 'decrypt',
             'algorithm': algorithm,
@@ -188,7 +171,6 @@ class EncryptionClient:
         
         if result['success']:
             try:
-                # Base64 decode et ve dosyaya kaydet
                 file_data = base64.b64decode(result['file_data'])
                 with open(output_path, 'wb') as f:
                     f.write(file_data)
@@ -205,7 +187,6 @@ class EncryptionClient:
         return result
     
     def list_algorithms(self):
-        """Mevcut algoritmaları listele"""
         message = {
             'operation': 'list_algorithms'
         }
@@ -213,7 +194,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def get_algorithm_info(self, algorithm):
-        """Algoritma bilgisi al"""
         message = {
             'operation': 'algorithm_info',
             'algorithm': algorithm
@@ -222,7 +202,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def list_files(self):
-        """Server'daki dosyaları listele"""
         message = {
             'operation': 'list_files'
         }
@@ -230,7 +209,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def get_file_info(self, file_id):
-        """Dosya bilgisi al"""
         message = {
             'operation': 'get_file_info',
             'file_id': file_id
@@ -239,7 +217,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def download_file(self, file_id):
-        """Şifrelenmiş dosyayı indir"""
         message = {
             'operation': 'download_file',
             'file_id': file_id
@@ -248,7 +225,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def delete_file(self, file_id):
-        """Dosyayı sil"""
         message = {
             'operation': 'delete_file',
             'file_id': file_id
@@ -257,7 +233,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def save_encrypted_file(self, encrypted_data, algorithm, params, original_filename=None):
-        """Şifrelenmiş dosyayı server'a kaydet"""
         message = {
             'operation': 'save_encrypted_file',
             'encrypted_data': encrypted_data,
@@ -269,7 +244,6 @@ class EncryptionClient:
         return self.send_message(message)
     
     def send_message_async(self, message, callback: Optional[Callable] = None):
-        """Mesajı asenkron olarak gönder"""
         def _send():
             result = self.send_message(message)
             if callback:
@@ -281,7 +255,6 @@ class EncryptionClient:
 
 
 def main():
-    """Ana fonksiyon - Standalone client test"""
     import argparse
     
     parser = argparse.ArgumentParser(description='Kriptoloji Şifreleme Client')
@@ -296,18 +269,15 @@ def main():
     client = EncryptionClient()
     
     try:
-        # Server'a bağlan
         if not client.connect(args.host, args.port):
             return
             
-        # Metni sifrele
         print(f"Sifreleme: '{args.text}' - Algoritma: {args.algorithm}")
         encrypt_result = client.encrypt_text(args.text, args.algorithm, shift=args.shift)
         
         if encrypt_result['success']:
             print(f"Sifrelenmis metin: {encrypt_result['encrypted_data']}")
             
-            # Sifrelenmis metni coz
             print(f"Cozme: '{encrypt_result['encrypted_data']}'")
             decrypt_result = client.decrypt_text(
                 encrypt_result['encrypted_data'], 

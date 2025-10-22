@@ -1,15 +1,9 @@
-"""
-Kriptoloji Projesi - Launcher
-Ana uygulama başlatıcısı
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import sys
 import os
 
-# Proje kök dizinini path'e ekle
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
@@ -18,11 +12,6 @@ from gui.client_window import ClientWindow
 
 
 class LauncherWindow:
-    """
-    Ana başlatıcı pencere
-    Server veya Client seçimi yapılır
-    """
-    
     def __init__(self, root):
         self.root = root
         self.setup_window()
@@ -34,29 +23,22 @@ class LauncherWindow:
         self.root.geometry("600x500")
         self.root.resizable(False, False)
         
-        # Pencereyi ortala
         self.root.update_idletasks()
         x = (self.root.winfo_screenwidth() // 2) - (600 // 2)
         y = (self.root.winfo_screenheight() // 2) - (500 // 2)
         self.root.geometry(f"600x500+{x}+{y}")
         
-        # Basit tema
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Pencere arka planı
         self.root.configure(bg='#f5f5f5')
         
-        # Pencere kapatma olayı
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
     def create_widgets(self):
-        """Widget'ları oluştur"""
-        # Ana container
         main_frame = tk.Frame(self.root, bg='#f5f5f5', padx=40, pady=40)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Başlık
         title_label = tk.Label(
             main_frame,
             text="🔐 Kriptoloji Projesi",
@@ -66,7 +48,6 @@ class LauncherWindow:
         )
         title_label.pack(pady=(0, 10))
         
-        # Alt başlık
         subtitle_label = tk.Label(
             main_frame,
             text="Server/Client Şifreleme Sistemi",
@@ -76,7 +57,6 @@ class LauncherWindow:
         )
         subtitle_label.pack(pady=(0, 30))
         
-        # Açıklama
         description_text = """
 Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemidir.
 
@@ -98,11 +78,9 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         )
         description_label.pack(pady=(0, 30))
         
-        # Seçim butonları
         button_frame = tk.Frame(main_frame, bg='#f5f5f5')
         button_frame.pack(pady=(0, 20))
         
-        # Server butonu
         server_button = tk.Button(
             button_frame,
             text="🖥️ Server Başlat",
@@ -117,7 +95,6 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         )
         server_button.pack(side=tk.LEFT, padx=(0, 20))
         
-        # Client butonu
         client_button = tk.Button(
             button_frame,
             text="💻 Client Başlat",
@@ -132,7 +109,6 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         )
         client_button.pack(side=tk.LEFT)
         
-        # Bilgi paneli
         info_frame = tk.LabelFrame(
             main_frame,
             text="Kullanım Talimatları",
@@ -159,7 +135,6 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         )
         info_label.pack(padx=15, pady=10)
         
-        # Alt bilgi
         footer_label = tk.Label(
             main_frame,
             text="Python + Tkinter + Socket tabanlı kriptoloji sistemi",
@@ -170,19 +145,14 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         footer_label.pack(side=tk.BOTTOM, pady=(20, 0))
         
     def start_server(self):
-        """Server'ı başlat"""
         try:
-            # Yeni pencere oluştur
             server_window = tk.Toplevel(self.root)
             server_window.title("Kriptoloji Server")
             
-            # Server arayüzünü başlat
             server_app = ServerWindow(server_window)
             
-            # Ana pencereyi gizle
             self.root.withdraw()
             
-            # Server penceresi kapatıldığında ana pencereyi göster
             def on_server_close():
                 self.root.deiconify()
                 server_window.destroy()
@@ -193,19 +163,14 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
             messagebox.showerror("Hata", f"Server başlatılamadı: {str(e)}")
     
     def start_client(self):
-        """Client'ı başlat"""
         try:
-            # Yeni pencere oluştur
             client_window = tk.Toplevel(self.root)
             client_window.title("Kriptoloji Client")
             
-            # Client arayüzünü başlat
             client_app = ClientWindow(client_window)
             
-            # Ana pencereyi gizle
             self.root.withdraw()
             
-            # Client penceresi kapatıldığında ana pencereyi göster
             def on_client_close():
                 self.root.deiconify()
                 client_window.destroy()
@@ -221,7 +186,6 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
 
 
 def main():
-    """Ana fonksiyon"""
     root = tk.Tk()
     app = LauncherWindow(root)
     root.mainloop()

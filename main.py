@@ -1,15 +1,8 @@
-#!/usr/bin/env python3
-"""
-🔐 Kriptoloji Projesi - Ana Uygulama
-Server/Client tabanlı şifreleme ve çözme uygulaması
-"""
-
 import sys
 import os
 import tkinter as tk
 from tkinter import messagebox
 
-# Proje kök dizinini path'e ekle
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
@@ -21,15 +14,12 @@ except ImportError as e:
     sys.exit(1)
 
 
-class KriptolojiApp:
-    """Ana uygulama sınıfı"""
-    
+class KriptolojiApp:    
     def __init__(self):
         self.root = None
         self.main_window = None
         
     def check_dependencies(self):
-        """Gerekli bağımlılıkları kontrol et"""
         required_modules = [
             'tkinter',
             'threading',
@@ -52,7 +42,6 @@ class KriptolojiApp:
         return True
         
     def check_project_structure(self):
-        """Proje yapısını kontrol et"""
         required_dirs = [
             'algorithms',
             'utils', 
@@ -85,22 +74,18 @@ class KriptolojiApp:
         return True
         
     def show_splash_screen(self):
-        """Başlangıç ekranı göster"""
         splash = tk.Tk()
         splash.title("Kriptoloji Projesi")
         splash.geometry("400x300")
         splash.resizable(False, False)
         
-        # Pencereyi ortala
         splash.update_idletasks()
         x = (splash.winfo_screenwidth() // 2) - (400 // 2)
         y = (splash.winfo_screenheight() // 2) - (300 // 2)
         splash.geometry(f"400x300+{x}+{y}")
         
-        # Arka plan
         splash.configure(bg='#667eea')
         
-        # Başlık
         title_label = tk.Label(
             splash,
             text="🔐 Kriptoloji Projesi",
@@ -110,7 +95,6 @@ class KriptolojiApp:
         )
         title_label.pack(pady=50)
         
-        # Alt başlık
         subtitle_label = tk.Label(
             splash,
             text="Server/Client Şifreleme Sistemi",
@@ -120,7 +104,6 @@ class KriptolojiApp:
         )
         subtitle_label.pack(pady=10)
         
-        # Yükleme mesajı
         loading_label = tk.Label(
             splash,
             text="Yükleniyor...",
@@ -130,46 +113,37 @@ class KriptolojiApp:
         )
         loading_label.pack(pady=20)
         
-        # Progress bar
         progress_frame = tk.Frame(splash, bg='#667eea')
         progress_frame.pack(pady=20)
         
         progress_bar = tk.Frame(progress_frame, bg='white', width=300, height=4)
         progress_bar.pack()
         
-        # Güncelleme
         splash.update()
         
         return splash
         
     def run(self):
-        """Uygulamayı çalıştır"""
         print("Kriptoloji Projesi Baslatiliyor...")
         print("=" * 50)
         
-        # Bağımlılıkları kontrol et
         if not self.check_dependencies():
             input("Devam etmek için Enter tuşuna basın...")
             return False
             
-        # Proje yapısını kontrol et
         if not self.check_project_structure():
             input("Devam etmek için Enter tuşuna basın...")
             return False
             
-        # Splash screen göster
         splash = self.show_splash_screen()
         
         try:
-            # Ana pencereyi oluştur
             print("OK - Bagimliliklar kontrol edildi")
             print("OK - Proje yapisi dogrulandi")
             print("Ana uygulama baslatiliyor...")
             
-            # Splash'i kapat
             splash.after(2000, splash.destroy)
             
-            # Ana pencereyi oluştur
             self.root = tk.Tk()
             self.main_window = LauncherWindow(self.root)
             
@@ -177,7 +151,6 @@ class KriptolojiApp:
             print("GUI arayuzu acildi")
             print("-" * 50)
             
-            # Ana döngüyü başlat
             self.root.mainloop()
             
             return True
@@ -185,7 +158,6 @@ class KriptolojiApp:
         except Exception as e:
             print(f"HATA - Uygulama baslatma hatasi: {e}")
             
-            # Splash'i kapat
             try:
                 splash.destroy()
             except:
@@ -199,7 +171,6 @@ class KriptolojiApp:
             return False
             
     def cleanup(self):
-        """Temizlik işlemleri"""
         if self.root:
             try:
                 self.root.destroy()
@@ -208,7 +179,6 @@ class KriptolojiApp:
 
 
 def main():
-    """Ana fonksiyon"""
     app = KriptolojiApp()
     
     try:

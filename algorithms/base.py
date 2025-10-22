@@ -1,26 +1,10 @@
-"""
-Şifreleme algoritmaları için temel sınıf
-Tüm şifreleme algoritmaları bu sınıftan türetilir
-"""
-
 from abc import ABC, abstractmethod
 from typing import Union, Dict, Any
 import re
 
 
 class TextEncryptionAlgorithm(ABC):
-    """
-    Şifreleme algoritmaları için temel sınıf
-    Tüm şifreleme algoritmaları bu sınıftan türetilmelidir
-    """
-    
     def __init__(self, name: str):
-        """
-        Algoritma sınıfını başlatır
-        
-        Args:
-            name: Algoritma adı
-        """
         self.name = name
         self.required_params = []
     

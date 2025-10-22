@@ -13,28 +13,23 @@ from utils.encryption_service import encryption_service
 from utils.file_manager import file_manager
 
 
-class EncryptionServer:
-    """Şifreleme işlemleri için socket server"""
-    
+class EncryptionServer:    
     def __init__(self, host='0.0.0.0', port=8080):
         self.host = host
         self.port = port
         self.server_socket = None
         self.is_running = False
         self.connected_clients = {}
-        self.clients_lock = threading.Lock()  # Thread safety için
+        self.clients_lock = threading.Lock()  
         self.logger = self._setup_logger()
     
     def _setup_logger(self):
-        """Logger kurulumu"""
         logger = logging.getLogger(f'EncryptionServer_{self.port}')
         logger.setLevel(logging.INFO)
-        
-        # Console handler
+
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
-        
-        # Formatter
+
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
@@ -44,7 +39,6 @@ class EncryptionServer:
         return logger
         
     def start(self):
-        """Server'ı başlat"""
         try:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -59,14 +53,12 @@ class EncryptionServer:
                 try:
                     client_socket, address = self.server_socket.accept()
                     client_info = f"{address[0]}:{address[1]}"
-                    
-                    # Thread-safe client ekleme
+
                     with self.clients_lock:
                         self.connected_clients[client_info] = client_socket
                     
                     self.logger.info(f"Yeni client baglandi: {client_info}")
-                    
-                    # Her client için ayrı thread
+  
                     client_thread = threading.Thread(
                         target=self.handle_client,
                         args=(client_socket, client_info),
@@ -75,7 +67,6 @@ class EncryptionServer:
                     client_thread.start()
                     
                 except socket.timeout:
-                    # Timeout normal, döngü devam etsin
                     continue
                 except socket.error:
                     if self.is_running:
@@ -86,10 +77,7 @@ class EncryptionServer:
             self.logger.error(f"Server baslatma hatasi: {e}")
             
     def stop(self):
-        """Server'ı durdur"""
         self.is_running = False
-        
-        # Tum client baglantilarini kapat
         with self.clients_lock:
             clients_copy = dict(self.connected_clients)
             for client_info, client_socket in clients_copy.items():
@@ -99,8 +87,7 @@ class EncryptionServer:
                 except:
                     pass
             self.connected_clients.clear()
-        
-        # Server socket'i kapat
+
         if self.server_socket:
             try:
                 self.server_socket.close()
@@ -109,17 +96,14 @@ class EncryptionServer:
                 pass
                 
     def handle_client(self, client_socket, client_info):
-        """Client mesajlarını işle"""
         try:
             while self.is_running:
-                # Mesaj uzunluğunu al (4 byte)
                 length_data = client_socket.recv(4)
                 if not length_data:
                     break
                     
                 length = int.from_bytes(length_data, byteorder='big')
                 
-                # Mesajı parça parça al
                 data = b''
                 while len(data) < length:
                     chunk = client_socket.recv(min(length - len(data), 4096))
@@ -134,15 +118,12 @@ class EncryptionServer:
                     message = json.loads(data.decode('utf-8'))
                     response = self.process_message(message)
                     
-                    # Yanıtı gönder
                     response_json = json.dumps(response, ensure_ascii=False)
                     response_bytes = response_json.encode('utf-8')
                     
-                    # Yanıt uzunluğunu gönder
                     length = len(response_bytes)
                     client_socket.send(length.to_bytes(4, byteorder='big'))
                     
-                    # Yanıtı gönder
                     client_socket.send(response_bytes)
                     
                 except json.JSONDecodeError:
@@ -183,7 +164,6 @@ class EncryptionServer:
             self.logger.info(f"Client baglantisi sonlandirildi: {client_info}")
             
     def process_message(self, message):
-        """Mesajı işle ve yanıt döndür"""
         try:
             operation = message.get('operation')
             algorithm = message.get('algorithm')
@@ -195,9 +175,7 @@ class EncryptionServer:
             
             if operation == 'encrypt':
                 if data_type == 'file':
-                    # Binary dosya şifreleme
                     try:
-                        # Base64 encoded data'yı decode et
                         file_data = base64.b64decode(data)
                         result = encryption_service.encrypt_file(file_data, algorithm, **params)
                     except Exception as e:
@@ -206,14 +184,11 @@ class EncryptionServer:
                             'error': f'Dosya şifreleme hatası: {str(e)}'
                         }
                 else:
-                    # Metin şifreleme
                     result = encryption_service.encrypt_text(data, algorithm, **params)
                     
             elif operation == 'decrypt':
                 if data_type == 'file':
-                    # Binary dosya çözme
                     try:
-                        # Base64 encoded data'yı decode et
                         file_data = base64.b64decode(data)
                         result = encryption_service.decrypt_file(file_data, algorithm, **params)
                     except Exception as e:
@@ -222,11 +197,9 @@ class EncryptionServer:
                             'error': f'Dosya çözme hatası: {str(e)}'
                         }
                 else:
-                    # Metin çözme
                     result = encryption_service.decrypt_text(data, algorithm, **params)
                     
             elif operation == 'list_algorithms':
-                # Mevcut algoritmaları listele
                 algorithms = encryption_service.get_available_algorithms()
                 result = {
                     'success': True,
@@ -234,7 +207,6 @@ class EncryptionServer:
                 }
                 
             elif operation == 'algorithm_info':
-                # Algoritma bilgisi al
                 try:
                     info = encryption_service.get_algorithm_info(algorithm)
                     result = {
@@ -248,7 +220,6 @@ class EncryptionServer:
                     }
                     
             elif operation == 'list_files':
-                # Kayıtlı dosyaları listele
                 try:
                     files = file_manager.list_files()
                     result = {
@@ -262,7 +233,6 @@ class EncryptionServer:
                     }
                     
             elif operation == 'get_file_info':
-                # Dosya bilgisi al
                 try:
                     file_id = message.get('file_id')
                     if not file_id:
@@ -289,7 +259,6 @@ class EncryptionServer:
                     }
                     
             elif operation == 'download_file':
-                # Şifrelenmiş dosyayı indir
                 try:
                     file_id = message.get('file_id')
                     if not file_id:
@@ -300,7 +269,6 @@ class EncryptionServer:
                     else:
                         file_data = file_manager.get_encrypted_file(file_id)
                         if file_data:
-                            # Base64 encode et
                             import base64
                             encoded_data = base64.b64encode(file_data).decode('utf-8')
                             result = {
@@ -320,7 +288,6 @@ class EncryptionServer:
                     }
                     
             elif operation == 'delete_file':
-                # Dosyayı sil
                 try:
                     file_id = message.get('file_id')
                     if not file_id:
@@ -341,7 +308,6 @@ class EncryptionServer:
                     }
                     
             elif operation == 'save_encrypted_file':
-                # Şifrelenmiş dosyayı kaydet
                 try:
                     encrypted_data = message.get('encrypted_data')
                     algorithm = message.get('algorithm')
@@ -354,11 +320,9 @@ class EncryptionServer:
                             'error': 'Şifrelenmiş veri ve algoritma belirtilmelidir'
                         }
                     else:
-                        # Base64 decode et
                         import base64
                         file_data = base64.b64decode(encrypted_data)
                         
-                        # Dosyayı kaydet
                         file_id = file_manager.save_encrypted_file(
                             file_data, algorithm, params, original_filename
                         )
@@ -392,7 +356,6 @@ class EncryptionServer:
 
 
 def main():
-    """Ana fonksiyon - Standalone server çalıştırma"""
     import argparse
     
     parser = argparse.ArgumentParser(description='Kriptoloji Şifreleme Server')
