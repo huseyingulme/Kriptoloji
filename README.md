@@ -1,39 +1,6 @@
 # Kriptoloji Projesi - Şifreleme ve Çözme Sistemi
 
-## 🚀 Özellikler
-
-### ✅ Modüler Yapı
-- Her şifreleme algoritması ayrı sınıfta implement edilmiş
-- OOP prensipleri uygulanmış (Encapsulation, Modularity, Reusable Code)
-- Yeni algoritma eklemek kolay
-
-### ✅ Server-Client Mimari
-- TCP socket iletişimi
-- Paket tabanlı veri transferi
-- Chunked data desteği
-- Ping/Pong mekanizması
-- Gerçek zamanlı şifreleme
-
-### ✅ Çoklu Veri Tipi Desteği
-- String ve dosya desteği
-- Binary data işleme
-- Metadata yönetimi
-- FileManager ile dosya yönetimi
-
-### ✅ GUI Destekli Uygulama
-- Tkinter tabanlı modern arayüz
-- 3 sekme: Metin, Dosya, Kayıtlı Dosyalar
-- Real-time server durumu
-- Algoritma bilgileri ve açıklamaları
-- Server IP/Port manuel girişi
-
-### ✅ Matematiksel Temel
-- Modüler aritmetik (Caesar, Vigenere)
-- Matris işlemleri (Hill Cipher)
-- Determinant ve ters matris hesaplama
-- Playfair 5x5 matris işlemleri
-
-## 🔐 Desteklenen Algoritmalar
+## Desteklenen Algoritmalar
 
 1. **Caesar Cipher** - Kaydırma tabanlı şifreleme
 2. **Vigenère Cipher** - Anahtar kelime tabanlı şifreleme
@@ -43,7 +10,7 @@
 6. **Columnar Transposition** - Sütunlu kaydırma tabanlı aktarım şifreleme
 7. **Polybius Cipher** - 5x5 tablo tabanlı satır/sütun şifreleme
 
-## 📁 Desteklenen Dosya Formatları
+##  Desteklenen Dosya Formatları
 
 - **Metin**: .txt, .md, .py, .js, .html, .css
 - **Resim**: .png, .jpg, .jpeg, .gif, .bmp
@@ -51,7 +18,7 @@
 - **Video**: .mp4, .avi, .mkv, .mov
 - **Doküman**: .pdf, .doc, .docx
 
-## 🚀 Kullanım
+##  Kullanım
 
 ### Server'ı Başlatma
 ```bash
@@ -63,7 +30,7 @@ python main.py server --host localhost --port 12345
 python main.py client
 ```
 
-## 💡 Kullanım Adımları
+##  Kullanım Adımları
 
 1. **Server'ı Başlatın**: `python main.py server`
 2. **Client'ı Başlatın**: `python main.py client`
@@ -74,7 +41,7 @@ python main.py client
 7. **Şifrele/Çöz**: İşlem tipini seçin ve "İşlemi Başlat" butonuna tıklayın
 8. **Sonucu Görün**: Şifrelenmiş/çözülmüş veri sonuç alanında görünür
 
-## 🔧 Algoritma Anahtar Formatları
+##  Algoritma Anahtar Formatları
 
 - **Caesar**: 1-999 arası sayı (örn: 3)
 - **Vigenere**: Alfabetik karakterler (örn: KEY)
@@ -84,31 +51,5 @@ python main.py client
 - **Columnar**: Anahtar kelime (örn: KEYWORD)
 - **Polybius**: Tablo düzeni anahtarı (opsiyonel)
 
-## 📊 Proje Yapısı
 
-```
-Kriptoloji/
-├── main.py                 # Ana giriş noktası
-├── server/
-│   ├── main.py            # Server uygulaması
-│   ├── algorithms/        # Şifreleme algoritmaları
-│   ├── network/          # Server network kodu
-│   └── processing/       # İşlem yönetimi
-├── client/
-│   ├── main.py           # Client uygulaması
-│   ├── gui/             # GUI arayüzü
-│   ├── network/         # Client network kodu
-│   └── file/            # Dosya yönetimi
-├── shared/
-│   └── utils.py         # Ortak yardımcı fonksiyonlar
-└── EncryptedFiles/      # Şifrelenmiş dosyalar
-```
-
-## 🎯 Amaç
-
-Bu proje, şifreleme mantığını gerçek veri akışı üzerinden test etmek için tasarlanmıştır. Hem string hem de dosya şifreleme desteği ile kullanıcılar farklı algoritmaları deneyebilir ve şifreleme/çözme işlemlerini gerçek zamanlı olarak gözlemleyebilir.
-
-## 👨‍💻 Geliştirici
-
-Hüseyin - Kriptoloji Projesi v2.0
 
