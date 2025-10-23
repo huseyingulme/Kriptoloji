@@ -1,4 +1,6 @@
+"""
 Caesar Cipher implementasyonu
+"""
 from server.algorithms.BaseCipher import BaseCipher
 from typing import Union
 
@@ -15,6 +17,7 @@ class CaesarCipher(BaseCipher):
         self.key_description = "1-999 arası sayı"
     
     def encrypt(self, data: bytes, key: str) -> bytes:
+        """
         Caesar şifreleme
         
         Args:
@@ -23,6 +26,7 @@ class CaesarCipher(BaseCipher):
         
         Returns:
             Şifrelenmiş veri
+        """
         try:
             shift = int(key) % 26
             result = bytearray()
@@ -43,6 +47,7 @@ class CaesarCipher(BaseCipher):
             raise Exception(f"Şifreleme hatası: {str(e)}")
     
     def decrypt(self, data: bytes, key: str) -> bytes:
+        """
         Caesar çözme
         
         Args:
@@ -51,6 +56,7 @@ class CaesarCipher(BaseCipher):
         
         Returns:
             Çözülmüş veri
+        """
         try:
             shift = int(key) % 26
             result = bytearray()
@@ -71,6 +77,7 @@ class CaesarCipher(BaseCipher):
             raise Exception(f"Çözme hatası: {str(e)}")
     
     def validate_key(self, key: str) -> bool:
+        """
         Caesar anahtar geçerliliğini kontrol eder
         
         Args:
@@ -78,6 +85,7 @@ class CaesarCipher(BaseCipher):
         
         Returns:
             Anahtar geçerliliği
+        """
         try:
             shift = int(key)
             return 1 <= shift <= 999

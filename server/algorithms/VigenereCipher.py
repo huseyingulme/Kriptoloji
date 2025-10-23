@@ -1,4 +1,6 @@
+"""
 Vigenère Cipher implementasyonu
+"""
 from server.algorithms.BaseCipher import BaseCipher
 from typing import Union
 
@@ -15,6 +17,7 @@ class VigenereCipher(BaseCipher):
         self.key_description = "Alfabetik karakterler (A-Z, a-z)"
     
     def encrypt(self, data: bytes, key: str) -> bytes:
+        """
         Vigenère şifreleme
         
         Args:
@@ -23,6 +26,7 @@ class VigenereCipher(BaseCipher):
         
         Returns:
             Şifrelenmiş veri
+        """
         try:
             clean_key = ''.join(c.upper() for c in key if c.isalpha())
             if not clean_key:
@@ -49,6 +53,7 @@ class VigenereCipher(BaseCipher):
             raise Exception(f"Şifreleme hatası: {str(e)}")
     
     def decrypt(self, data: bytes, key: str) -> bytes:
+        """
         Vigenère çözme
         
         Args:
@@ -57,6 +62,7 @@ class VigenereCipher(BaseCipher):
         
         Returns:
             Çözülmüş veri
+        """
         try:
             clean_key = ''.join(c.upper() for c in key if c.isalpha())
             if not clean_key:
@@ -83,6 +89,7 @@ class VigenereCipher(BaseCipher):
             raise Exception(f"Çözme hatası: {str(e)}")
     
     def validate_key(self, key: str) -> bool:
+        """
         Vigenère anahtar geçerliliğini kontrol eder
         
         Args:
@@ -90,6 +97,7 @@ class VigenereCipher(BaseCipher):
         
         Returns:
             Anahtar geçerliliği
+        """
         if not key:
             return False
         

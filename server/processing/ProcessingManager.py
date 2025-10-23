@@ -1,4 +1,6 @@
+"""
 ProcessingManager sınıfı - İşlem taleplerini yönetir ve algoritmaları çağırır
+"""
 from typing import Dict, Any, Optional
 from shared.utils import Logger
 
@@ -39,6 +41,7 @@ class ProcessingManager:
     
     def process_request(self, data: bytes, operation: str, algorithm: str, 
                       key: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
         İşlem talebini işler
         
         Args:
@@ -50,6 +53,7 @@ class ProcessingManager:
         
         Returns:
             İşlem sonucu
+        """
         try:
             if algorithm not in self.algorithms:
                 return {

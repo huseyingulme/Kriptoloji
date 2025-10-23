@@ -63,7 +63,15 @@ class ServerApplication:
 
 def main():
     try:
-        app = ServerApplication()
+        import argparse
+        
+        parser = argparse.ArgumentParser(description="Kriptoloji Server")
+        parser.add_argument("--host", default="localhost", help="Server host adresi")
+        parser.add_argument("--port", type=int, default=12345, help="Server port numarası")
+        
+        args = parser.parse_args()
+        
+        app = ServerApplication(args.host, args.port)
         app.start()
         
     except Exception as e:
