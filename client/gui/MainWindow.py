@@ -108,7 +108,7 @@ class MainWindow:
         
         ttk.Label(settings_frame, text="Algoritma:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
         algorithm_combo = ttk.Combobox(settings_frame, textvariable=self.algorithm_var, 
-                                     values=["caesar", "vigenere", "hill", "playfair", "railfence", "columnar", "polybius"], state="readonly")
+                                     values=["caesar", "vigenere", "hill", "playfair", "railfence", "columnar", "polybius", "aes"], state="readonly")
         algorithm_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
         algorithm_combo.bind("<<ComboboxSelected>>", self._on_algorithm_changed)
         
@@ -180,7 +180,7 @@ class MainWindow:
         
         ttk.Label(settings_frame, text="Algoritma:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
         algorithm_combo = ttk.Combobox(settings_frame, textvariable=self.algorithm_var, 
-                                     values=["caesar", "vigenere", "hill", "playfair", "railfence", "columnar", "polybius"], state="readonly")
+                                     values=["caesar", "vigenere", "hill", "playfair", "railfence", "columnar", "polybius", "aes"], state="readonly")
         algorithm_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
         algorithm_combo.bind("<<ComboboxSelected>>", self._on_algorithm_changed)
         
@@ -685,7 +685,8 @@ class MainWindow:
             "playfair": "Anahtar kelime (J hariç, örn: MONARCHY)",
             "railfence": "Ray sayısı 2-10 arası (örn: 3)",
             "columnar": "Anahtar kelime (örn: KEYWORD)",
-            "polybius": "Tablo düzeni anahtarı (opsiyonel)"
+            "polybius": "Tablo düzeni anahtarı (opsiyonel)",
+            "aes": "Anahtar: 'key' veya 'key_size:mode:key' (örn: '256:CBC:my_secret_key')"
         }
         return key_infos.get(algorithm, "")
     
@@ -734,7 +735,19 @@ Matematik: Sütun sıralama""",
 5x5 tablo tabanlı satır/sütun şifreleme.
 Anahtar: Tablo düzeni (opsiyonel)
 Örnek: "HELLO" → "23 15 31 31 34"
-Matematik: Satır-sütun koordinatları"""
+Matematik: Satır-sütun koordinatları""",
+            
+            "aes": """AES (Advanced Encryption Standard)
+Modern simetrik blok şifreleme algoritması.
+Anahtar: 'key' veya 'key_size:mode:key' formatında
+Key size: 128, 192, 256 bit
+Modlar: ECB, CBC, CFB, OFB, CTR, GCM
+Örnek: "256:CBC:my_secret_key"
+Özellikler:
+- 128-bit blok şifreleme
+- Çok güvenli ve hızlı
+- Günümüzde en yaygın kullanılan şifreleme
+Matematik: Rijndael algoritması, SubBytes, ShiftRows, MixColumns, AddRoundKey"""
         }
         
         description = algorithm_descriptions.get(algorithm, "Bilinmeyen algoritma")
@@ -777,6 +790,25 @@ Matematik: Satır-sütun koordinatları"""
         elif algorithm == "polybius":
             return True  # Polybius anahtar opsiyonel
         
+        elif algorithm == "aes":
+            # AES anahtar formatı: 'key' veya 'key_size:mode:key'
+            if not key:
+                return False
+            try:
+                parts = key.split(':', 2)
+                if len(parts) == 1:
+                    # Sadece anahtar
+                    return len(key) >= 8
+                elif len(parts) == 3:
+                    # key_size:mode:key formatı
+                    key_size = int(parts[0])
+                    mode = parts[1].upper()
+                    key_val = parts[2]
+                    return key_size in [128, 192, 256] and mode in ['ECB', 'CBC', 'CFB', 'OFB', 'CTR', 'GCM'] and len(key_val) >= 8
+                return False
+            except ValueError:
+                return False
+        
         return False
     
     def _on_key_focus_in(self, event):
@@ -789,7 +821,8 @@ Matematik: Satır-sütun koordinatları"""
             "playfair": "Örnek: MONARCHY",
             "railfence": "Örnek: 3",
             "columnar": "Örnek: KEYWORD",
-            "polybius": "Opsiyonel"
+            "polybius": "Opsiyonel",
+            "aes": "Örnek: 256:CBC:my_secret_key"
         }
         
         placeholder = placeholder_texts.get(algorithm, "")
@@ -817,7 +850,8 @@ Matematik: Satır-sütun koordinatları"""
             "playfair": "MONARCHY",
             "railfence": "3",
             "columnar": "KEYWORD",
-            "polybius": ""
+            "polybius": "",
+            "aes": "256:CBC:my_secret_key"
         }
         
         example_key = example_keys.get(algorithm, "")
@@ -859,6 +893,7 @@ Desteklenen Algoritmalar:
 • Rail Fence Cipher - Zikzak aktarım
 • Columnar Transposition - Sütunlu kaydırma
 • Polybius Cipher - Satır/sütun tabanlı
+• AES (Advanced Encryption Standard) - Modern simetrik blok şifreleme
 
 Desteklenen Dosya Formatları:
 • Metin: .txt, .md, .py, .js, .html, .css

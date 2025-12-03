@@ -34,6 +34,9 @@ class ProcessingManager:
             from server.algorithms.PolybiusCipher import PolybiusCipher
             self.algorithms['polybius'] = PolybiusCipher()
             
+            from server.algorithms.AESCipher import AESCipher
+            self.algorithms['aes'] = AESCipher()
+            
             Logger.info(f"{len(self.algorithms)} algoritma kaydedildi", "ProcessingManager")
             
         except Exception as e:
