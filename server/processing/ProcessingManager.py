@@ -37,6 +37,9 @@ class ProcessingManager:
             from server.algorithms.AESCipher import AESCipher
             self.algorithms['aes'] = AESCipher()
             
+            from server.algorithms.DESCipher import DESCipher
+            self.algorithms['des'] = DESCipher()
+            
             Logger.info(f"{len(self.algorithms)} algoritma kaydedildi", "ProcessingManager")
             
         except Exception as e:
