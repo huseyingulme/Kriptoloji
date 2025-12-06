@@ -11,12 +11,12 @@ from algorithms import get_algorithm, get_available_algorithms, get_algorithm_in
 class EncryptionService:
     def __init__(self):
         self.available_algorithms = get_available_algorithms()
-    
+
     def encrypt_text(self, text: str, algorithm: str, **params) -> Dict[str, Any]:
         try:
             cipher = get_algorithm(algorithm)
             encrypted_text = cipher.encrypt(text, **params)
-            
+
             return {
                 'success': True,
                 'encrypted_data': encrypted_text,
@@ -24,7 +24,7 @@ class EncryptionService:
                 'params': params,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
@@ -32,13 +32,13 @@ class EncryptionService:
                 'algorithm': algorithm,
                 'params': params
             }
-    
+
     def decrypt_text(self, encrypted_text: str, algorithm: str, **params) -> Dict[str, Any]:
         try:
             cipher = get_algorithm(algorithm)
-            
+
             decrypted_text = cipher.decrypt(encrypted_text, **params)
-            
+
             return {
                 'success': True,
                 'decrypted_data': decrypted_text,
@@ -46,7 +46,7 @@ class EncryptionService:
                 'params': params,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
@@ -54,15 +54,15 @@ class EncryptionService:
                 'algorithm': algorithm,
                 'params': params
             }
-    
+
     def encrypt_file(self, file_data: bytes, algorithm: str, **params) -> Dict[str, Any]:
         try:
             cipher = get_algorithm(algorithm)
             file_data_str = base64.b64encode(file_data).decode('utf-8')
             encrypted_data = cipher.encrypt(file_data_str, **params)
-            
+
             encrypted_bytes = base64.b64encode(encrypted_data.encode('utf-8'))
-            
+
             return {
                 'success': True,
                 'encrypted_data': encrypted_bytes.decode('utf-8'),
@@ -72,7 +72,7 @@ class EncryptionService:
                 'encrypted_size': len(encrypted_bytes),
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
@@ -80,18 +80,18 @@ class EncryptionService:
                 'algorithm': algorithm,
                 'params': params
             }
-    
+
     def decrypt_file(self, encrypted_data: str, algorithm: str, **params) -> Dict[str, Any]:
         try:
             cipher = get_algorithm(algorithm)
-            
+
             encrypted_bytes = base64.b64decode(encrypted_data)
             encrypted_str = encrypted_bytes.decode('utf-8')
-            
+
             decrypted_str = cipher.decrypt(encrypted_str, **params)
-            
+
             decrypted_data = base64.b64decode(decrypted_str)
-            
+
             return {
                 'success': True,
                 'file_data': base64.b64encode(decrypted_data).decode('utf-8'),
@@ -99,7 +99,7 @@ class EncryptionService:
                 'params': params,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
@@ -107,10 +107,10 @@ class EncryptionService:
                 'algorithm': algorithm,
                 'params': params
             }
-    
+
     def get_available_algorithms(self) -> List[str]:
         return self.available_algorithms.copy()
-    
+
     def get_algorithm_info(self, algorithm: str) -> Dict[str, Any]:
         try:
             return get_algorithm_info(algorithm)
@@ -119,19 +119,19 @@ class EncryptionService:
                 'success': False,
                 'error': str(e)
             }
-    
+
     def validate_algorithm_params(self, algorithm: str, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
             cipher = get_algorithm(algorithm)
             is_valid = cipher.validate_params(params)
-            
+
             return {
                 'success': True,
                 'valid': is_valid,
                 'required_params': cipher.required_params,
                 'missing_params': [p for p in cipher.required_params if p not in params]
             }
-            
+
         except Exception as e:
             return {
                 'success': False,

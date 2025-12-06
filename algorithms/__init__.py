@@ -18,7 +18,7 @@ AVAILABLE_ALGORITHMS = {
 def get_algorithm(name: str) -> TextEncryptionAlgorithm:
     if name not in AVAILABLE_ALGORITHMS:
         raise ValueError(f"Bilinmeyen algoritma: {name}")
-    
+
     return AVAILABLE_ALGORITHMS[name]()
 
 def get_available_algorithms() -> list:
@@ -31,7 +31,7 @@ def get_algorithm_info(name: str) -> dict:
 __all__ = [
     'TextEncryptionAlgorithm',
     'CaesarCipher',
-    'VigenereCipher', 
+    'VigenereCipher',
     'AffineCipher',
     'SubstitutionCipher',
     'RailFenceCipher',

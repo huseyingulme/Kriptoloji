@@ -9,10 +9,10 @@ from shared.utils import Logger
 def main():
     try:
         Logger.info("Client uygulaması başlatılıyor...", "Client")
-        
+
         app = MainWindow()
         app.run()
-        
+
     except Exception as e:
         Logger.error(f"Client başlatma hatası: {str(e)}", "Client")
         print(f"Hata: {str(e)}")
@@ -20,4 +20,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
