@@ -1,9 +1,6 @@
-"""
-Hill Cipher implementasyonu
-"""
+
 from server.algorithms.BaseCipher import BaseCipher
 from typing import Union
-
 
 class HillCipher(BaseCipher):
     
@@ -15,19 +12,10 @@ class HillCipher(BaseCipher):
         self.min_key_length = 4
         self.max_key_length = 16
         self.key_description = "2x2 veya 3x3 matris (ör: 1,2,3,4)"
-        self.matrix_size = 2  # Varsayılan 2x2 matris
+        self.matrix_size = 2
     
     def encrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Hill şifreleme
         
-        Args:
-            data: Şifrelenecek veri
-            key: Matris anahtarı (virgülle ayrılmış sayılar)
-        
-        Returns:
-            Şifrelenmiş veri
-        """
         try:
             key_matrix = self._parse_key(key)
             
@@ -50,16 +38,7 @@ class HillCipher(BaseCipher):
             raise Exception(f"Şifreleme hatası: {str(e)}")
     
     def decrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Hill çözme
         
-        Args:
-            data: Çözülecek veri
-            key: Matris anahtarı
-        
-        Returns:
-            Çözülmüş veri
-        """
         try:
             key_matrix = self._parse_key(key)
             
@@ -185,15 +164,7 @@ class HillCipher(BaseCipher):
         return None
     
     def validate_key(self, key: str) -> bool:
-        """
-        Hill anahtar geçerliliğini kontrol eder
         
-        Args:
-            key: Kontrol edilecek anahtar
-        
-        Returns:
-            Anahtar geçerliliği
-        """
         try:
             key_values = [int(x.strip()) for x in key.split(',')]
             

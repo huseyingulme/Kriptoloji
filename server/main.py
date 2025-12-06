@@ -9,7 +9,6 @@ from server.network.Server import Server
 from server.processing.ProcessingManager import ProcessingManager
 from shared.utils import Logger
 
-
 class ServerApplication:
     
     def __init__(self, host="localhost", port=12345):
@@ -60,7 +59,6 @@ class ServerApplication:
         self.stop()
         sys.exit(0)
 
-
 def main():
     try:
         import argparse
@@ -78,7 +76,6 @@ def main():
         Logger.error(f"Server başlatma hatası: {str(e)}", "ServerApp")
         print(f"Hata: {str(e)}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

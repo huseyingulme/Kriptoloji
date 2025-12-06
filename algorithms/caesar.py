@@ -1,7 +1,6 @@
 from .base import TextEncryptionAlgorithm
 from typing import Union
 
-
 class CaesarCipher(TextEncryptionAlgorithm):
     def __init__(self):
         super().__init__("Caesar")

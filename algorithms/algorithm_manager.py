@@ -1,7 +1,6 @@
 from typing import Dict, List, Any, Optional
 from . import get_algorithm, get_available_algorithms, get_algorithm_info
 
-
 class AlgorithmManager:
     def __init__(self):
         self.available_algorithms = get_available_algorithms()
@@ -36,6 +35,5 @@ class AlgorithmManager:
                     'error': 'Bilgi alınamadı'
                 }
         return algorithms_info
-
 
 algorithm_manager = AlgorithmManager()

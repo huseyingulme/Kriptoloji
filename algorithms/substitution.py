@@ -3,7 +3,6 @@ from typing import Union, Dict
 import random
 import string
 
-
 class SubstitutionCipher(TextEncryptionAlgorithm):
     def __init__(self):
         super().__init__("Substitution")

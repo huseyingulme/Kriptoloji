@@ -1,6 +1,5 @@
 from server.algorithms.BaseCipher import BaseCipher
 
-
 class ColumnarTranspositionCipher(BaseCipher):
     
     def __init__(self):

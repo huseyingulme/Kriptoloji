@@ -2,7 +2,6 @@ from .base import TextEncryptionAlgorithm
 from typing import Union
 import math
 
-
 class AffineCipher(TextEncryptionAlgorithm):
     def __init__(self):
         super().__init__("Affine")
@@ -35,7 +34,6 @@ class AffineCipher(TextEncryptionAlgorithm):
         if not (0 <= b <= 25):
             return False
         
-        # a ve 26 aralarında asal olmalı
         return self._gcd(a, 26) == 1
     
     def encrypt(self, data: Union[str, bytes], **kwargs) -> Union[str, bytes]:
@@ -53,17 +51,13 @@ class AffineCipher(TextEncryptionAlgorithm):
         result = []
         for char in text:
             if char.isalpha():
-                # Büyük/küçük harf durumunu koru
                 is_upper = char.isupper()
                 base_char = char.upper()
                 
-                # Harfi sayıya çevir (A=0, B=1, ...)
                 x = ord(base_char) - ord('A')
-                # Affine formülü: E(x) = (ax + b) mod 26
                 encrypted_x = (a * x + b) % 26
                 encrypted_char = chr(encrypted_x + ord('A'))
                 
-                # Orijinal duruma göre büyük/küçük harf ayarla
                 if not is_upper:
                     encrypted_char = encrypted_char.lower()
                     
@@ -85,23 +79,18 @@ class AffineCipher(TextEncryptionAlgorithm):
         
         text = data if isinstance(data, str) else data.decode('utf-8')
         
-        # a'nın modüler tersini hesapla
         a_inverse = self._mod_inverse(a, 26)
         
         result = []
         for char in text:
             if char.isalpha():
-                # Büyük/küçük harf durumunu koru
                 is_upper = char.isupper()
                 base_char = char.upper()
                 
-                # Şifrelenmiş harfi sayıya çevir
                 y = ord(base_char) - ord('A')
-                # Affine çözme formülü: D(y) = a^(-1)(y - b) mod 26
                 decrypted_x = (a_inverse * (y - b)) % 26
                 decrypted_char = chr(decrypted_x + ord('A'))
                 
-                # Orijinal duruma göre büyük/küçük harf ayarla
                 if not is_upper:
                     decrypted_char = decrypted_char.lower()
                     

@@ -1,7 +1,6 @@
 from .base import TextEncryptionAlgorithm
 from typing import Union
 
-
 class VigenereCipher(TextEncryptionAlgorithm):
     def __init__(self):
         super().__init__("Vigenere")

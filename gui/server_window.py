@@ -11,7 +11,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.encryption_service import encryption_service
 
-
 class ServerWindow:
     def __init__(self, root):
         self.root = root
@@ -539,15 +538,7 @@ class ServerWindow:
             y = (info_window.winfo_screenheight() // 2) - (300 // 2)
             info_window.geometry(f"400x300+{x}+{y}")
 
-            info_text = f"""Depolama Bilgileri
-{'='*40}
-
-Toplam Dosya Sayısı: {info['total_files']}
-Toplam Boyut: {info['total_size_mb']} MB ({info['total_size_bytes']} bytes)
-
-Klasörler:
-• Şifrelenmiş Dosyalar: {info['encrypted_dir']}
-• Metadata: {info['metadata_dir']}"""
+            info_text = f
 
             text_widget = tk.Text(
                 info_window,
@@ -576,12 +567,10 @@ Klasörler:
             self.add_message(f"Depolama bilgisi alınamadı: {str(e)}")
             messagebox.showerror("Hata", f"Depolama bilgisi alınamadı: {str(e)}")
 
-
 def main():
     root = tk.Tk()
     app = ServerWindow(root)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

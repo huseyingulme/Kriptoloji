@@ -4,7 +4,6 @@ import hashlib
 import os
 from typing import Dict, Any, Tuple, List
 
-
 class DataPacket:
     
     @staticmethod
@@ -70,7 +69,6 @@ class DataPacket:
         
         return b''.join([chunk_data for _, chunk_data in parsed_chunks])
 
-
 class FileUtils:
     
     SUPPORTED_FORMATS = {
@@ -102,7 +100,6 @@ class FileUtils:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-
 
 class Logger:
     

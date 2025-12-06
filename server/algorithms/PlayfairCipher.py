@@ -1,7 +1,6 @@
 import re
 from server.algorithms.BaseCipher import BaseCipher
 
-
 class PlayfairCipher(BaseCipher):
     
     def __init__(self):

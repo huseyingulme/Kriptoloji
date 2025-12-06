@@ -9,7 +9,6 @@ from typing import Optional, Callable
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
 class EncryptionClient:
     
     def __init__(self):
@@ -19,14 +18,14 @@ class EncryptionClient:
         self.port = None
         self.connection_lock = threading.Lock()
         self.max_retries = 3
-        self.retry_delay = 1.0  # saniye
+        self.retry_delay = 1.0
         
     def connect(self, host='127.0.0.1', port=8080, retry_callback: Optional[Callable] = None):
         with self.connection_lock:
             for attempt in range(self.max_retries):
                 try:
                     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self.socket.settimeout(10.0)  # 10 saniye timeout
+                    self.socket.settimeout(10.0)
                     self.socket.connect((host, port))
                     
                     self.host = host
@@ -253,7 +252,6 @@ class EncryptionClient:
         thread.start()
         return thread
 
-
 def main():
     import argparse
     
@@ -298,7 +296,6 @@ def main():
         print(f"Client hatasi: {e}")
     finally:
         client.disconnect()
-
 
 if __name__ == "__main__":
     main()

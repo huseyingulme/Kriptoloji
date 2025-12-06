@@ -5,7 +5,6 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import shutil
 
-
 class FileManager:
     def __init__(self, base_dir: str = "EncryptedFiles"):
         self.base_dir = base_dir
@@ -15,7 +14,7 @@ class FileManager:
         self._create_directories()
     
     def _create_directories(self):
-        """Gerekli klasörleri oluşturur"""
+        
         for directory in [self.base_dir, self.encrypted_dir, self.metadata_dir]:
             os.makedirs(directory, exist_ok=True)
     
@@ -163,6 +162,5 @@ class FileManager:
             file_data = f.read()
         
         return self.save_encrypted_file(file_data, algorithm, params, original_filename)
-
 
 file_manager = FileManager()

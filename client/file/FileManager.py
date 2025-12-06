@@ -1,19 +1,13 @@
-"""
-Dosya yönetimi sınıfı - Dosya açma, kaydetme ve format kontrolü
-"""
+
 import os
 import json
 from typing import Optional, Dict, Any, List
 from shared.utils import FileUtils, Logger
 
-
 class FileManager:
     
     def __init__(self, base_path: str = "EncryptedFiles"):
-        """
-        Args:
-            base_path: Dosyaların saklanacağı ana dizin
-        """
+        
         self.base_path = base_path
         self.encrypted_path = os.path.join(base_path, "encrypted")
         self.metadata_path = os.path.join(base_path, "metadata")
@@ -25,17 +19,7 @@ class FileManager:
             os.makedirs(path, exist_ok=True)
     
     def save_file(self, data: bytes, filename: str, metadata: Dict[str, Any] = None) -> bool:
-        """
-        Dosyayı kaydeder
         
-        Args:
-            data: Kaydedilecek veri
-            filename: Dosya adı
-            metadata: Ek bilgiler (algorithm, key, timestamp vb.)
-        
-        Returns:
-            Başarı durumu
-        """
         try:
             if metadata is None:
                 metadata = {}
@@ -66,15 +50,7 @@ class FileManager:
             return False
     
     def load_file(self, filename: str) -> Optional[bytes]:
-        """
-        Dosyayı yükler
         
-        Args:
-            filename: Yüklenecek dosya adı
-        
-        Returns:
-            Dosya verisi veya None
-        """
         try:
             file_path = os.path.join(self.encrypted_path, filename)
             
@@ -93,15 +69,7 @@ class FileManager:
             return None
     
     def load_metadata(self, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Dosya metadata'sını yükler
         
-        Args:
-            filename: Metadata'sı yüklenecek dosya adı
-        
-        Returns:
-            Metadata dictionary veya None
-        """
         try:
             metadata_filename = f"{os.path.splitext(filename)[0]}_metadata.json"
             metadata_path = os.path.join(self.metadata_path, metadata_filename)
@@ -120,12 +88,7 @@ class FileManager:
             return None
     
     def list_files(self) -> List[Dict[str, Any]]:
-        """
-        Kayıtlı dosyaları listeler
         
-        Returns:
-            Dosya bilgileri listesi
-        """
         files = []
         
         try:
@@ -147,15 +110,7 @@ class FileManager:
             return []
     
     def delete_file(self, filename: str) -> bool:
-        """
-        Dosyayı siler
         
-        Args:
-            filename: Silinecek dosya adı
-        
-        Returns:
-            Başarı durumu
-        """
         try:
             file_path = os.path.join(self.encrypted_path, filename)
             if os.path.exists(file_path):
@@ -174,15 +129,7 @@ class FileManager:
             return False
     
     def get_file_info(self, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Dosya hakkında detaylı bilgi döndürür
         
-        Args:
-            filename: Bilgi alınacak dosya adı
-        
-        Returns:
-            Dosya bilgileri veya None
-        """
         try:
             file_path = os.path.join(self.encrypted_path, filename)
             

@@ -10,7 +10,6 @@ sys.path.insert(0, project_root)
 from gui.server_window import ServerWindow
 from gui.client_window import ClientWindow
 
-
 class LauncherWindow:
     def __init__(self, root):
         self.root = root
@@ -18,7 +17,7 @@ class LauncherWindow:
         self.create_widgets()
         
     def setup_window(self):
-        """Pencere ayarlarını yap"""
+        
         self.root.title("Kriptoloji Projesi - Ana Menü")
         self.root.geometry("600x500")
         self.root.resizable(False, False)
@@ -57,16 +56,7 @@ class LauncherWindow:
         )
         subtitle_label.pack(pady=(0, 30))
         
-        description_text = """
-Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemidir.
-
-Özellikler:
-• 5 farklı şifreleme algoritması (Caesar, Vigenere, Affine, Substitution, Rail Fence)
-• Server-Client tabanlı güvenli iletişim
-• Dosya ve metin şifreleme/çözme
-• Kullanıcı dostu arayüz
-• Otomatik dosya yönetimi
-        """
+        description_text = 
         
         description_label = tk.Label(
             main_frame,
@@ -118,12 +108,7 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
         )
         info_frame.pack(fill=tk.X, pady=(20, 0))
         
-        info_text = """
-1. Önce "Server Başlat" butonuna tıklayarak server'ı çalıştırın
-2. Sonra "Client Başlat" butonuna tıklayarak client'ı açın
-3. Client'ta server'a bağlanın (varsayılan: 127.0.0.1:8080)
-4. Şifreleme/çözme işlemlerinizi gerçekleştirin
-        """
+        info_text = 
         
         info_label = tk.Label(
             info_frame,
@@ -181,15 +166,13 @@ Bu proje, güvenli veri alışverişi için tasarlanmış bir kriptoloji sistemi
             messagebox.showerror("Hata", f"Client başlatılamadı: {str(e)}")
     
     def on_closing(self):
-        """Pencere kapatılırken temizlik"""
+        
         self.root.destroy()
-
 
 def main():
     root = tk.Tk()
     app = LauncherWindow(root)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

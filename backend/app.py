@@ -12,7 +12,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.encryption_service import encryption_service
 from utils.file_manager import file_manager
 
-
 class EncryptionServer:    
     def __init__(self, host='0.0.0.0', port=8080):
         self.host = host
@@ -44,7 +43,7 @@ class EncryptionServer:
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((self.host, self.port))
             self.server_socket.listen(5)
-            self.server_socket.settimeout(1.0)  # Timeout ekle
+            self.server_socket.settimeout(1.0)
             
             self.is_running = True
             self.logger.info(f"Sifreleme Server'i baslatildi - {self.host}:{self.port}")
@@ -169,7 +168,7 @@ class EncryptionServer:
             algorithm = message.get('algorithm')
             data = message.get('data')
             params = message.get('params', {})
-            data_type = message.get('data_type', 'text')  # text veya file
+            data_type = message.get('data_type', 'text')
             
             self.logger.info(f"Islem: {operation}, Algoritma: {algorithm}, Tip: {data_type}")
             
@@ -354,7 +353,6 @@ class EncryptionServer:
                 'error': str(e)
             }
 
-
 def main():
     import argparse
     
@@ -374,7 +372,6 @@ def main():
     except Exception as e:
         print(f"Server hatasi: {e}")
         server.stop()
-
 
 if __name__ == "__main__":
     main()

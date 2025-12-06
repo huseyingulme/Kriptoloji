@@ -1,7 +1,6 @@
 from .base import TextEncryptionAlgorithm
 from typing import Union, List
 
-
 class RailFenceCipher(TextEncryptionAlgorithm):
     def __init__(self):
         super().__init__("Rail Fence")
@@ -10,12 +9,11 @@ class RailFenceCipher(TextEncryptionAlgorithm):
     def _create_rails(self, text: str, num_rails: int) -> List[List[str]]:
         rails = [[] for _ in range(num_rails)]
         rail_index = 0
-        direction = 1  # 1: aşağı, -1: yukarı
+        direction = 1
         
         for char in text:
             rails[rail_index].append(char)
             
-            # Yön değiştir
             if rail_index == 0:
                 direction = 1
             elif rail_index == num_rails - 1:
@@ -33,7 +31,6 @@ class RailFenceCipher(TextEncryptionAlgorithm):
         for i in range(length):
             positions.append(rail_index)
             
-            # Yön değiştir
             if rail_index == 0:
                 direction = 1
             elif rail_index == num_rails - 1:

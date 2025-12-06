@@ -4,15 +4,10 @@ import time
 from typing import Optional, Dict, Any, Callable
 from shared.utils import DataPacket, Logger
 
-
 class Server:
     
     def __init__(self, host: str = "localhost", port: int = 12345):
-        """
-        Args:
-            host: Server adresi
-            port: Server portu
-        """
+        
         self.host = host
         self.port = port
         self.socket: Optional[socket.socket] = None

@@ -1,21 +1,14 @@
-"""
-Client sınıfı - Server ile iletişim kurar
-"""
+
 import socket
 import threading
 import time
 from typing import Optional, Callable, Dict, Any
 from shared.utils import DataPacket, Logger
 
-
 class Client:
     
     def __init__(self, host: str = "localhost", port: int = 12345):
-        """
-        Args:
-            host: Server adresi
-            port: Server portu
-        """
+        
         self.host = host
         self.port = port
         self.socket: Optional[socket.socket] = None
@@ -24,15 +17,10 @@ class Client:
         self.error_callback: Optional[Callable] = None
         
     def connect(self) -> bool:
-        """
-        Server'a bağlanır
         
-        Returns:
-            Bağlantı durumu
-        """
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(10)  # 10 saniye timeout
+            self.socket.settimeout(10)
             self.socket.connect((self.host, self.port))
             self.connected = True
             
@@ -55,19 +43,7 @@ class Client:
     
     def send_request(self, data: bytes, operation: str, algorithm: str, key: str, 
                    metadata: Dict[str, Any] = None) -> bool:
-        """
-        Server'a işlem talebi gönderir
         
-        Args:
-            data: İşlenecek veri
-            operation: İşlem tipi (ENCRYPT/DECRYPT)
-            algorithm: Kullanılacak algoritma
-            key: Şifreleme anahtarı
-            metadata: Ek bilgiler
-        
-        Returns:
-            Gönderim durumu
-        """
         if not self.connected:
             Logger.error("Server bağlantısı yok", "Client")
             return False
@@ -85,7 +61,7 @@ class Client:
             
             packet = DataPacket.create_packet(data, operation, metadata)
             
-            if len(packet) > 1024:  # 1KB'den büyükse parçala
+            if len(packet) > 1024:
                 chunks = DataPacket.create_chunked_packet(packet, 1024)
                 
                 for i, chunk in enumerate(chunks):
@@ -102,12 +78,7 @@ class Client:
             return False
     
     def receive_response(self) -> Optional[Dict[str, Any]]:
-        """
-        Server'dan cevap alır
         
-        Returns:
-            Cevap verisi veya None
-        """
         if not self.connected:
             Logger.error("Server bağlantısı yok", "Client")
             return None
@@ -148,19 +119,7 @@ class Client:
     
     def process_request(self, data: bytes, operation: str, algorithm: str, key: str,
                       metadata: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-        """
-        İşlem talebini gönderir ve cevabı alır
         
-        Args:
-            data: İşlenecek veri
-            operation: İşlem tipi (ENCRYPT/DECRYPT)
-            algorithm: Kullanılacak algoritma
-            key: Şifreleme anahtarı
-            metadata: Ek bilgiler
-        
-        Returns:
-            İşlem sonucu veya None
-        """
         if not self.connected:
             if not self.connect():
                 return None

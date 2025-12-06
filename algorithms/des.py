@@ -7,13 +7,8 @@ from cryptography.hazmat.primitives import padding
 import os
 import hashlib
 
-
 class DESCipher(TextEncryptionAlgorithm):
-    """
-    DES (Data Encryption Standard) şifreleme algoritması
-    Metin tabanlı kullanım için wrapper
-    """
-    
+
     SUPPORTED_MODES = ['ECB', 'CBC', 'CFB', 'OFB']
     DEFAULT_MODE = 'CBC'
     
@@ -22,7 +17,7 @@ class DESCipher(TextEncryptionAlgorithm):
         self.required_params = ['key']
     
     def _parse_key_string(self, key_string: str) -> tuple:
-        """Anahtar string'ini parse eder"""
+        
         parts = key_string.split(':', 1)
         
         if len(parts) == 1:
@@ -39,13 +34,13 @@ class DESCipher(TextEncryptionAlgorithm):
             raise ValueError(f"Geçersiz anahtar formatı. Doğru format: 'key' veya 'mode:key'")
     
     def _derive_key(self, key_string: str) -> bytes:
-        """Anahtar string'inden DES anahtarı türetir (8 byte)"""
+        
         key_hash = hashlib.sha256(key_string.encode()).digest()
         des_key = key_hash[:8]
         return des_key
     
     def _get_mode_object(self, mode_name: str, iv: bytes = None):
-        """Mod adından mode objesi oluşturur"""
+        
         if mode_name == 'ECB':
             return modes.ECB()
         elif mode_name == 'CBC':
@@ -64,7 +59,7 @@ class DESCipher(TextEncryptionAlgorithm):
             raise ValueError(f"Desteklenmeyen mod: {mode_name}")
     
     def encrypt(self, data: Union[str, bytes], **kwargs) -> Union[str, bytes]:
-        """Metni DES ile şifreler"""
+        
         if not self.validate_params(kwargs):
             raise ValueError("Gerekli parametreler eksik: key")
         
@@ -72,16 +67,12 @@ class DESCipher(TextEncryptionAlgorithm):
         text = data if isinstance(data, str) else data.decode('utf-8')
         
         try:
-            # Anahtarı parse et
             mode_name, key_str = self._parse_key_string(key_string)
             
-            # DES anahtarını türet
             des_key = self._derive_key(key_str)
             
-            # Metni bytes'a çevir
             text_bytes = text.encode('utf-8')
             
-            # IV oluştur (ECB hariç)
             if mode_name == 'ECB':
                 iv = None
                 mode = self._get_mode_object(mode_name)
@@ -89,13 +80,11 @@ class DESCipher(TextEncryptionAlgorithm):
                 iv = os.urandom(8)
                 mode = self._get_mode_object(mode_name, iv)
             
-            # TripleDES kullan (cryptography kütüphanesi DES'i desteklemez)
-            triple_des_key = des_key * 3  # 24 byte
+            triple_des_key = des_key * 3
             algorithm = algorithms.TripleDES(triple_des_key)
             cipher = Cipher(algorithm, mode, backend=default_backend())
             encryptor = cipher.encryptor()
             
-            # Padding (ECB ve CBC için)
             if mode_name in ['ECB', 'CBC']:
                 padder = padding.PKCS7(64).padder()
                 padded_data = padder.update(text_bytes)
@@ -103,10 +92,8 @@ class DESCipher(TextEncryptionAlgorithm):
             else:
                 padded_data = text_bytes
             
-            # Şifreleme
             ciphertext = encryptor.update(padded_data) + encryptor.finalize()
             
-            # IV + ciphertext'i base64 ile encode et
             result_bytes = iv + ciphertext if iv else ciphertext
             result = base64.b64encode(result_bytes).decode('utf-8')
             
@@ -116,7 +103,7 @@ class DESCipher(TextEncryptionAlgorithm):
             raise ValueError(f"Şifreleme hatası: {str(e)}")
     
     def decrypt(self, data: Union[str, bytes], **kwargs) -> Union[str, bytes]:
-        """DES ile şifrelenmiş metni çözer"""
+        
         if not self.validate_params(kwargs):
             raise ValueError("Gerekli parametreler eksik: key")
         
@@ -124,16 +111,12 @@ class DESCipher(TextEncryptionAlgorithm):
         encrypted_text = data if isinstance(data, str) else data.decode('utf-8')
         
         try:
-            # Anahtarı parse et
             mode_name, key_str = self._parse_key_string(key_string)
             
-            # DES anahtarını türet
             des_key = self._derive_key(key_str)
             
-            # Base64 decode
             encrypted_bytes = base64.b64decode(encrypted_text)
             
-            # IV'yi ayır
             if mode_name == 'ECB':
                 iv = None
                 ciphertext = encrypted_bytes
@@ -141,19 +124,15 @@ class DESCipher(TextEncryptionAlgorithm):
                 iv = encrypted_bytes[:8]
                 ciphertext = encrypted_bytes[8:]
             
-            # Mode oluştur
             mode = self._get_mode_object(mode_name, iv) if iv else self._get_mode_object(mode_name)
             
-            # TripleDES kullan
-            triple_des_key = des_key * 3  # 24 byte
+            triple_des_key = des_key * 3
             algorithm = algorithms.TripleDES(triple_des_key)
             cipher = Cipher(algorithm, mode, backend=default_backend())
             decryptor = cipher.decryptor()
             
-            # Çözme
             decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
             
-            # Padding'i kaldır (ECB ve CBC için)
             if mode_name in ['ECB', 'CBC']:
                 unpadder = padding.PKCS7(64).unpadder()
                 result_bytes = unpadder.update(decrypted_data)
@@ -161,7 +140,6 @@ class DESCipher(TextEncryptionAlgorithm):
             else:
                 result_bytes = decrypted_data
             
-            # Bytes'ı string'e çevir
             result = result_bytes.decode('utf-8')
             
             return result
@@ -170,7 +148,7 @@ class DESCipher(TextEncryptionAlgorithm):
             raise ValueError(f"Çözme hatası: {str(e)}")
     
     def get_info(self):
-        """Algoritma bilgilerini döndürür"""
+        
         info = super().get_info()
         info.update({
             'description': 'Data Encryption Standard - Klasik simetrik blok şifreleme algoritması. Metin tabanlı kullanım için base64 encoding kullanır.',

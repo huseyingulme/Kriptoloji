@@ -1,9 +1,6 @@
-"""
-ProcessingManager sınıfı - İşlem taleplerini yönetir ve algoritmaları çağırır
-"""
+
 from typing import Dict, Any, Optional
 from shared.utils import Logger
-
 
 class ProcessingManager:
     
@@ -47,19 +44,7 @@ class ProcessingManager:
     
     def process_request(self, data: bytes, operation: str, algorithm: str, 
                       key: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        İşlem talebini işler
         
-        Args:
-            data: İşlenecek veri
-            operation: İşlem tipi (ENCRYPT/DECRYPT)
-            algorithm: Kullanılacak algoritma
-            key: Şifreleme anahtarı
-            metadata: Ek bilgiler
-        
-        Returns:
-            İşlem sonucu
-        """
         try:
             if algorithm not in self.algorithms:
                 return {
@@ -135,7 +120,7 @@ class ProcessingManager:
         if hasattr(cipher, 'validate_key'):
             return cipher.validate_key(key)
         
-        return bool(key)  # Varsayılan kontrol
+        return bool(key)
     
     def get_key_requirements(self, algorithm: str) -> Dict[str, Any]:
         if algorithm not in self.algorithms:

@@ -8,7 +8,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from algorithms import get_algorithm, get_available_algorithms, get_algorithm_info
 
-
 class EncryptionService:
     def __init__(self):
         self.available_algorithms = get_available_algorithms()
@@ -138,6 +137,5 @@ class EncryptionService:
                 'success': False,
                 'error': str(e)
             }
-
 
 encryption_service = EncryptionService()

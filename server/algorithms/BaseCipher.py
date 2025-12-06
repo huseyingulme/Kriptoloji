@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union
 
-
 class BaseCipher(ABC):
     
     def __init__(self):

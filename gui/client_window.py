@@ -9,7 +9,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.client import EncryptionClient
 
-
 class ClientWindow:    
     def __init__(self, root):
         self.root = root
@@ -347,7 +346,7 @@ class ClientWindow:
         self.server_files = []
         
     def create_results_panel(self, parent):
-        """Sonuçlar panelini oluştur"""
+        
         results_frame = tk.LabelFrame(
             parent,
             text="Sonuçlar ve Loglar",
@@ -472,7 +471,7 @@ class ClientWindow:
             self.create_rail_fence_params()
             
     def connect_to_server(self):
-        """Server'a bağlan"""
+        
         if not self.client.is_connected:
             host = self.host_var.get()
             port = int(self.port_var.get())
@@ -491,7 +490,7 @@ class ClientWindow:
             self.update_connection_status(False)
             
     def update_connection_status(self, connected):
-        """Bağlantı durumunu güncelle"""
+        
         if connected:
             self.connection_button.config(text="Bağlantıyı Kes", bg='#f44336')
             self.connection_status.config(text="Bağlı", fg='#4CAF50')
@@ -505,7 +504,7 @@ class ClientWindow:
             self.server_files = []
             
     def select_file(self):
-        """Dosya seç"""
+        
         filename = filedialog.askopenfilename(
             title="Şifrelenecek Dosyayı Seç",
             filetypes=[
@@ -522,7 +521,7 @@ class ClientWindow:
             self.add_log(f"Dosya seçildi: {os.path.basename(filename)}")
             
     def get_algorithm_params(self):
-        """Seçili algoritmanın parametrelerini al"""
+        
         algorithm = self.algorithm_var.get()
         
         if algorithm == "caesar":
@@ -539,7 +538,7 @@ class ClientWindow:
         return {}
         
     def start_operation(self):
-        """İşlemi başlat"""
+        
         if not self.client.is_connected:
             messagebox.showerror("Hata", "Önce server'a bağlanmalısınız!")
             return
@@ -637,7 +636,7 @@ class ClientWindow:
             self.add_log(f"[{timestamp}] İşlem başarısız: {result['error']}")
             
     def add_log(self, message):
-        """Log mesajı ekle"""
+        
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}\n"
         
@@ -647,19 +646,19 @@ class ClientWindow:
         self.results_text.config(state=tk.DISABLED)
         
     def clear_input(self):
-        """Girişi temizle"""
+        
         self.text_input.delete("1.0", tk.END)
         self.file_path_var.set("")
         self.current_encrypted_data = None
         
     def clear_results(self):
-        """Sonuçları temizle"""
+        
         self.results_text.config(state=tk.NORMAL)
         self.results_text.delete("1.0", tk.END)
         self.results_text.config(state=tk.DISABLED)
         
     def save_result(self):
-        """Sonucu kaydet"""
+        
         content = self.results_text.get("1.0", tk.END)
         if not content.strip():
             messagebox.showwarning("Uyarı", "Kaydedilecek sonuç bulunmuyor!")
@@ -680,7 +679,7 @@ class ClientWindow:
                 messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
                 
     def generate_substitution_key(self):
-        """Rastgele substitution anahtarı oluştur"""
+        
         import random
         import string
         
@@ -692,7 +691,7 @@ class ClientWindow:
         self.add_log(f"Rastgele anahtar oluşturuldu: {random_key}")
     
     def refresh_file_list(self):
-        """Server'daki dosya listesini yenile"""
+        
         if not self.client.is_connected:
             messagebox.showerror("Hata", "Önce server'a bağlanmalısınız!")
             return
@@ -708,7 +707,7 @@ class ClientWindow:
         self.add_log("Dosya listesi yenileniyor...")
     
     def update_file_list(self, result):
-        """Dosya listesini güncelle"""
+        
         if result['success']:
             self.server_files = result['files']
             self.file_listbox.delete(0, tk.END)
@@ -722,7 +721,7 @@ class ClientWindow:
             self.add_log(f"Dosya listesi alınamadı: {result['error']}")
     
     def on_file_selected(self, event):
-        """Dosya seçildiğinde bilgi göster"""
+        
         selection = self.file_listbox.curselection()
         if not selection:
             return
@@ -733,12 +732,8 @@ class ClientWindow:
             self.show_file_info_display(file_info)
     
     def show_file_info_display(self, file_info):
-        """Dosya bilgisini göster"""
-        info_text = f"""Dosya: {file_info['filename']}
-Algoritma: {file_info['algorithm']}
-Oluşturulma: {file_info['created_at']}
-Boyut: {file_info['file_size']} bytes
-ID: {file_info['file_id']}"""
+        
+        info_text = f
         
         self.file_info_text.config(state=tk.NORMAL)
         self.file_info_text.delete("1.0", tk.END)
@@ -746,7 +741,7 @@ ID: {file_info['file_id']}"""
         self.file_info_text.config(state=tk.DISABLED)
     
     def download_selected_file(self):
-        """Seçili dosyayı indir"""
+        
         selection = self.file_listbox.curselection()
         if not selection:
             messagebox.showwarning("Uyarı", "Lütfen bir dosya seçin!")
@@ -770,7 +765,7 @@ ID: {file_info['file_id']}"""
         self.add_log(f"Dosya indiriliyor: {file_info['filename']}")
     
     def handle_download_result(self, result, file_info):
-        """İndirme sonucunu işle"""
+        
         if result['success']:
             filename = filedialog.asksaveasfilename(
                 title="Şifrelenmiş Dosyayı Kaydet",
@@ -795,7 +790,7 @@ ID: {file_info['file_id']}"""
             messagebox.showerror("Hata", f"Dosya indirilemedi: {result['error']}")
     
     def delete_selected_file(self):
-        """Seçili dosyayı sil"""
+        
         selection = self.file_listbox.curselection()
         if not selection:
             messagebox.showwarning("Uyarı", "Lütfen bir dosya seçin!")
@@ -865,19 +860,7 @@ ID: {file_info['file_id']}"""
             y = (info_window.winfo_screenheight() // 2) - (400 // 2)
             info_window.geometry(f"500x400+{x}+{y}")
             
-            info_text = f"""Dosya Bilgileri
-{'='*50}
-
-Dosya Adı: {file_info['filename']}
-Dosya ID: {file_info['file_id']}
-Algoritma: {file_info['algorithm']}
-Orijinal Dosya: {file_info.get('original_filename', 'Bilinmiyor')}
-Oluşturulma Tarihi: {file_info['created_at']}
-Dosya Boyutu: {file_info['file_size']} bytes
-Dosya Mevcut: {'Evet' if file_info['file_exists'] else 'Hayır'}
-
-Algoritma Parametreleri:
-{json.dumps(file_info.get('params', {}), indent=2, ensure_ascii=False)}"""
+            info_text = f
             
             text_widget = scrolledtext.ScrolledText(
                 info_window,
@@ -928,12 +911,10 @@ Algoritma Parametreleri:
             self.add_log(f"Server'a kaydetme başarısız: {result['error']}")
             messagebox.showerror("Hata", f"Server'a kaydetme başarısız: {result['error']}")
 
-
 def main():
     root = tk.Tk()
     app = ClientWindow(root)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

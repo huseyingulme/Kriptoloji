@@ -1,9 +1,6 @@
-"""
-Vigenère Cipher implementasyonu
-"""
+
 from server.algorithms.BaseCipher import BaseCipher
 from typing import Union
-
 
 class VigenereCipher(BaseCipher):
     
@@ -17,16 +14,7 @@ class VigenereCipher(BaseCipher):
         self.key_description = "Alfabetik karakterler (A-Z, a-z)"
     
     def encrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Vigenère şifreleme
         
-        Args:
-            data: Şifrelenecek veri
-            key: Şifreleme anahtarı
-        
-        Returns:
-            Şifrelenmiş veri
-        """
         try:
             clean_key = ''.join(c.upper() for c in key if c.isalpha())
             if not clean_key:
@@ -36,16 +24,16 @@ class VigenereCipher(BaseCipher):
             key_index = 0
             
             for byte in data:
-                if 65 <= byte <= 90:  # Büyük harf
+                if 65 <= byte <= 90:
                     shift = ord(clean_key[key_index % len(clean_key)]) - 65
                     result.append((byte - 65 + shift) % 26 + 65)
                     key_index += 1
-                elif 97 <= byte <= 122:  # Küçük harf
+                elif 97 <= byte <= 122:
                     shift = ord(clean_key[key_index % len(clean_key)]) - 65
                     result.append((byte - 97 + shift) % 26 + 97)
                     key_index += 1
                 else:
-                    result.append(byte)  # Diğer karakterler değişmez
+                    result.append(byte)
             
             return bytes(result)
             
@@ -53,16 +41,7 @@ class VigenereCipher(BaseCipher):
             raise Exception(f"Şifreleme hatası: {str(e)}")
     
     def decrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Vigenère çözme
         
-        Args:
-            data: Çözülecek veri
-            key: Çözme anahtarı
-        
-        Returns:
-            Çözülmüş veri
-        """
         try:
             clean_key = ''.join(c.upper() for c in key if c.isalpha())
             if not clean_key:
@@ -72,16 +51,16 @@ class VigenereCipher(BaseCipher):
             key_index = 0
             
             for byte in data:
-                if 65 <= byte <= 90:  # Büyük harf
+                if 65 <= byte <= 90:
                     shift = ord(clean_key[key_index % len(clean_key)]) - 65
                     result.append((byte - 65 - shift) % 26 + 65)
                     key_index += 1
-                elif 97 <= byte <= 122:  # Küçük harf
+                elif 97 <= byte <= 122:
                     shift = ord(clean_key[key_index % len(clean_key)]) - 65
                     result.append((byte - 97 - shift) % 26 + 97)
                     key_index += 1
                 else:
-                    result.append(byte)  # Diğer karakterler değişmez
+                    result.append(byte)
             
             return bytes(result)
             
@@ -89,15 +68,7 @@ class VigenereCipher(BaseCipher):
             raise Exception(f"Çözme hatası: {str(e)}")
     
     def validate_key(self, key: str) -> bool:
-        """
-        Vigenère anahtar geçerliliğini kontrol eder
         
-        Args:
-            key: Kontrol edilecek anahtar
-        
-        Returns:
-            Anahtar geçerliliği
-        """
         if not key:
             return False
         
