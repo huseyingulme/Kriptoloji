@@ -4,13 +4,15 @@ from .vigenere import VigenereCipher
 from .affine import AffineCipher
 from .substitution import SubstitutionCipher
 from .rail_fence import RailFenceCipher
+from .des import DESCipher
 
 AVAILABLE_ALGORITHMS = {
     'caesar': CaesarCipher,
     'vigenere': VigenereCipher,
     'affine': AffineCipher,
     'substitution': SubstitutionCipher,
-    'rail_fence': RailFenceCipher
+    'rail_fence': RailFenceCipher,
+    'des': DESCipher
 }
 
 def get_algorithm(name: str) -> TextEncryptionAlgorithm:
@@ -33,6 +35,7 @@ __all__ = [
     'AffineCipher',
     'SubstitutionCipher',
     'RailFenceCipher',
+    'DESCipher',
     'get_algorithm',
     'get_available_algorithms',
     'get_algorithm_info',
