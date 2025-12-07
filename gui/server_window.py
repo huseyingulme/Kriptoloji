@@ -538,7 +538,7 @@ class ServerWindow:
             y = (info_window.winfo_screenheight() // 2) - (300 // 2)
             info_window.geometry(f"400x300+{x}+{y}")
 
-            info_text = f
+            info_text = f"Toplam Dosya: {info['total_files']}\nToplam Boyut: {info['total_size_mb']} MB\nŞifrelenmiş Dosyalar: {info['encrypted_dir']}\nMetadata: {info['metadata_dir']}"
 
             text_widget = tk.Text(
                 info_window,

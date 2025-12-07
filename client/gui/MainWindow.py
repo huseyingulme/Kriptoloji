@@ -350,7 +350,23 @@ class MainWindow:
                     return
 
                 self.root.after(0, lambda: self.progress_var.set(30))
-                data = text.encode('utf-8')
+                
+                # Çözme işlemi için hex string kontrolü
+                if operation == "DECRYPT":
+                    # Hex string kontrolü (sadece 0-9, a-f, A-F karakterleri)
+                    text_clean = text.replace(" ", "").replace("\n", "").replace("\t", "")
+                    if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
+                        try:
+                            data = bytes.fromhex(text_clean)
+                        except ValueError:
+                            # Hex değilse normal text olarak işle
+                            data = text.encode('utf-8')
+                    else:
+                        # Normal text olarak işle
+                        data = text.encode('utf-8')
+                else:
+                    # Şifreleme için normal encode
+                    data = text.encode('utf-8')
 
                 self.root.after(0, lambda: self.progress_var.set(50))
                 response = self.client.process_request(data, operation, algorithm, key)
@@ -365,14 +381,32 @@ class MainWindow:
                         except:
                             result_text = f"Şifrelenmiş Veri (Hex):\n{result_data.hex()}"
                     else:
-                        result_text = result_data.decode('utf-8', errors='ignore')
+                        try:
+                            result_text = result_data.decode('utf-8', errors='ignore')
+                        except Exception as decode_error:
+                            # Decode edilemezse hex olarak göster
+                            result_text = f"Çözülmüş Veri (Hex):\n{result_data.hex()}\n\nDecode hatası: {str(decode_error)}"
 
                     self.root.after(0, lambda: self.progress_var.set(100))
                     self.root.after(0, lambda: self._update_text_result(result_text))
                 else:
                     error_msg = "İşlem başarısız."
-                    if response and 'metadata' in response:
-                        error_msg = response['metadata'].get('error', error_msg)
+                    if response:
+                        # Önce direkt error alanını kontrol et
+                        if 'error' in response:
+                            error_msg = response['error']
+                        # Sonra metadata'dan error'u kontrol et
+                        elif 'metadata' in response and 'error' in response['metadata']:
+                            error_msg = response['metadata']['error']
+                        # ERROR paket tipi kontrolü
+                        elif 'type' in response and response['type'] == 'ERROR':
+                            if 'metadata' in response and 'error' in response['metadata']:
+                                error_msg = response['metadata']['error']
+                            else:
+                                error_msg = "Server hatası: Bilinmeyen hata"
+                        # Genel başarısız durum
+                        elif not response.get('success', False):
+                            error_msg = "İşlem başarısız oldu. Lütfen tekrar deneyin."
                     self.root.after(0, lambda: messagebox.showerror("Hata", error_msg))
 
                 self.root.after(0, lambda: self.progress_var.set(0))
@@ -674,21 +708,14 @@ class MainWindow:
         algorithm = self.algorithm_var.get()
 
         algorithm_descriptions = {
-            "caesar": ,
-
-            "vigenere": ,
-
-            "hill": ,
-
-            "playfair": ,
-
-            "railfence": ,
-
-            "columnar": ,
-
-            "polybius": ,
-
-            "aes":
+            "caesar": "Klasik kaydırma tabanlı şifreleme algoritması",
+            "vigenere": "Anahtar kelime tabanlı çoklu kaydırma şifrelemesi",
+            "hill": "Matris tabanlı şifreleme algoritması",
+            "playfair": "5x5 matris tabanlı çift karakter şifreleme",
+            "railfence": "Zikzak desen tabanlı aktarım şifrelemesi",
+            "columnar": "Sütunlu kaydırma tabanlı aktarım şifrelemesi",
+            "polybius": "5x5 tablo tabanlı satır/sütun şifrelemesi",
+            "aes": "Advanced Encryption Standard - Modern simetrik blok şifreleme"
         }
 
         description = algorithm_descriptions.get(algorithm, "Bilinmeyen algoritma")
@@ -819,7 +846,7 @@ class MainWindow:
                 self.key_status_label.config(text="✗ Geçersiz anahtar formatı", foreground="red")
 
     def _show_about(self):
-        about_text =
+        about_text = "Kriptoloji Projesi\nŞifreleme/Çözme Sistemi\n\nPython + Tkinter + Socket tabanlı kriptoloji sistemi"
         messagebox.showinfo("Hakkında", about_text)
 
     def _on_closing(self):

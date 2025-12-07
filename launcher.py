@@ -56,7 +56,7 @@ class LauncherWindow:
         )
         subtitle_label.pack(pady=(0, 30))
 
-        description_text =
+        description_text = "Bu uygulama server ve client modlarında çalışabilen bir kriptoloji şifreleme/çözme sistemidir."
 
         description_label = tk.Label(
             main_frame,
@@ -108,7 +108,7 @@ class LauncherWindow:
         )
         info_frame.pack(fill=tk.X, pady=(20, 0))
 
-        info_text =
+        info_text = "1. Server'ı başlatın\n2. Client'ı başlatın ve server'a bağlanın\n3. Şifreleme algoritması seçin ve işlem yapın"
 
         info_label = tk.Label(
             info_frame,

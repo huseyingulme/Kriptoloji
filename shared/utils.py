@@ -102,12 +102,34 @@ class FileUtils:
         return hash_md5.hexdigest()
 
 class Logger:
-
+    _advanced_logger = None
+    
+    @staticmethod
+    def _get_logger():
+        if Logger._advanced_logger is None:
+            try:
+                from shared.advanced_logger import advanced_logger
+                Logger._advanced_logger = advanced_logger
+            except:
+                Logger._advanced_logger = None
+        return Logger._advanced_logger
+    
     @staticmethod
     def log(level: str, message: str, component: str = "SYSTEM"):
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] [{level}] [{component}] {message}")
+        logger = Logger._get_logger()
+        if logger:
+            if level == "INFO":
+                logger.info(message, component)
+            elif level == "ERROR":
+                logger.error(message, component)
+            elif level == "WARNING":
+                logger.warning(message, component)
+            elif level == "DEBUG":
+                logger.debug(message, component)
+        else:
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[{timestamp}] [{level}] [{component}] {message}")
 
     @staticmethod
     def info(message: str, component: str = "SYSTEM"):

@@ -3,23 +3,30 @@ import threading
 import time
 from typing import Optional, Callable, Dict, Any
 from shared.utils import DataPacket, Logger
+from shared.error_handler import ErrorHandler, AutoReconnect
+from config import config_manager
 
 class Client:
 
-    def __init__(self, host: str = "localhost", port: int = 12345):
+    def __init__(self, host: str = None, port: int = None):
 
-        self.host = host
-        self.port = port
+        self.host = host or config_manager.get("client.default_host", "localhost")
+        self.port = port or config_manager.get("client.default_port", 12345)
         self.socket: Optional[socket.socket] = None
         self.connected = False
         self.response_callback: Optional[Callable] = None
         self.error_callback: Optional[Callable] = None
+        self.connection_timeout = config_manager.get("client.connection_timeout", 10)
+        self.retry_attempts = config_manager.get("client.retry_attempts", 3)
+        self.retry_delay = config_manager.get("client.retry_delay", 1.0)
+        self.auto_reconnect = config_manager.get("client.auto_reconnect", True)
 
+    @ErrorHandler.retry(max_attempts=3, delay=1.0, exceptions=(ConnectionError, OSError, TimeoutError))
     def connect(self) -> bool:
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(10)
+            self.socket.settimeout(self.connection_timeout)
             self.socket.connect((self.host, self.port))
             self.connected = True
 
@@ -29,7 +36,7 @@ class Client:
         except Exception as e:
             Logger.error(f"Bağlantı hatası: {str(e)}", "Client")
             self.connected = False
-            return False
+            raise
 
     def disconnect(self):
         try:
@@ -102,20 +109,35 @@ class Client:
                 data = DataPacket.reassemble_chunks(chunks)
                 _, packet_type, metadata = DataPacket.parse_packet(data)
 
+            is_success = packet_type not in ['ERROR', 'FAILED']
+            
             response = {
                 'data': data,
                 'type': packet_type,
                 'metadata': metadata,
-                'success': packet_type not in ['ERROR', 'FAILED']
+                'success': is_success
             }
+            
+            # Hata durumunda error mesajını metadata'dan al
+            if not is_success and metadata:
+                if 'error' in metadata:
+                    response['error'] = metadata['error']
+                else:
+                    response['error'] = f"Server hatası: {packet_type}"
 
-            Logger.info(f"Server cevabı alındı: {packet_type}", "Client")
+            if is_success:
+                Logger.info(f"Server cevabı alındı: {packet_type}", "Client")
+            else:
+                error_msg = response.get('error', 'Bilinmeyen hata')
+                Logger.warning(f"Server hatası: {error_msg}", "Client")
+            
             return response
 
         except Exception as e:
             Logger.error(f"Cevap alma hatası: {str(e)}", "Client")
             return None
 
+    @AutoReconnect(max_attempts=5, delay=2.0)
     def process_request(self, data: bytes, operation: str, algorithm: str, key: str,
                       metadata: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
 
@@ -124,6 +146,8 @@ class Client:
                 return None
 
         if not self.send_request(data, operation, algorithm, key, metadata):
+            if self.auto_reconnect:
+                raise ConnectionError("İstek gönderilemedi")
             return None
 
         response = self.receive_response()

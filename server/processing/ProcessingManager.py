@@ -1,5 +1,7 @@
+import time
 from typing import Dict, Any, Optional
 from shared.utils import Logger
+from shared.advanced_logger import advanced_logger
 
 class ProcessingManager:
 
@@ -68,12 +70,20 @@ class ProcessingManager:
 
             cipher = self.algorithms[algorithm]
 
+            start_time = time.time()
+            
             if operation == 'ENCRYPT':
                 result_data = cipher.encrypt(data, key)
+                duration = time.time() - start_time
                 Logger.info(f"Şifreleme tamamlandı: {algorithm}", "ProcessingManager")
+                advanced_logger.log_performance(f"encrypt_{algorithm}", duration, {"data_size": len(data)})
+                advanced_logger.log_operation("encrypt", algorithm, True, {"data_size": len(data), "duration": duration})
             elif operation == 'DECRYPT':
                 result_data = cipher.decrypt(data, key)
+                duration = time.time() - start_time
                 Logger.info(f"Çözme tamamlandı: {algorithm}", "ProcessingManager")
+                advanced_logger.log_performance(f"decrypt_{algorithm}", duration, {"data_size": len(data)})
+                advanced_logger.log_operation("decrypt", algorithm, True, {"data_size": len(data), "duration": duration})
             else:
                 return {
                     'success': False,
@@ -88,8 +98,28 @@ class ProcessingManager:
                 'operation': operation
             }
 
+        except ValueError as e:
+            Logger.error(f"Geçersiz parametre hatası: {str(e)}", "ProcessingManager")
+            advanced_logger.log_operation(operation.lower(), algorithm, False, {"error": str(e), "type": "ValueError"})
+            return {
+                'success': False,
+                'error': f"Geçersiz parametre: {str(e)}",
+                'data': None
+            }
+        except KeyError as e:
+            Logger.error(f"Eksik parametre hatası: {str(e)}", "ProcessingManager")
+            advanced_logger.log_operation(operation.lower(), algorithm, False, {"error": str(e), "type": "KeyError"})
+            return {
+                'success': False,
+                'error': f"Eksik parametre: {str(e)}",
+                'data': None
+            }
         except Exception as e:
             Logger.error(f"İşlem hatası: {str(e)}", "ProcessingManager")
+            import traceback
+            error_trace = traceback.format_exc()
+            Logger.debug(f"Detaylı hata: {error_trace}", "ProcessingManager")
+            advanced_logger.log_operation(operation.lower(), algorithm, False, {"error": str(e), "traceback": error_trace})
             return {
                 'success': False,
                 'error': f"İşlem hatası: {str(e)}",

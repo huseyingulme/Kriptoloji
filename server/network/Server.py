@@ -3,31 +3,41 @@ import threading
 import time
 from typing import Optional, Dict, Any, Callable
 from shared.utils import DataPacket, Logger
+from config import config_manager
 
 class Server:
 
-    def __init__(self, host: str = "localhost", port: int = 12345):
+    def __init__(self, host: str = None, port: int = None):
 
-        self.host = host
-        self.port = port
+        self.host = host or config_manager.get("server.host", "localhost")
+        self.port = port or config_manager.get("server.port", 12345)
         self.socket: Optional[socket.socket] = None
         self.running = False
         self.clients = []
         self.processing_callback: Optional[Callable] = None
+        self.max_clients = config_manager.get("server.max_clients", 10)
+        self.timeout = config_manager.get("server.timeout", 30)
 
     def start(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.socket.settimeout(1.0)
             self.socket.bind((self.host, self.port))
-            self.socket.listen(5)
+            self.socket.listen(self.max_clients)
             self.running = True
 
-            Logger.info(f"Server başlatıldı: {self.host}:{self.port}", "Server")
+            Logger.info(f"Server başlatıldı: {self.host}:{self.port} (Max clients: {self.max_clients})", "Server")
 
             while self.running:
                 try:
+                    if len(self.clients) >= self.max_clients:
+                        Logger.warning(f"Maksimum client sayısına ulaşıldı: {self.max_clients}", "Server")
+                        time.sleep(1)
+                        continue
+                    
                     client_socket, client_address = self.socket.accept()
+                    client_socket.settimeout(self.timeout)
                     Logger.info(f"Yeni client bağlandı: {client_address}", "Server")
 
                     client_thread = threading.Thread(
@@ -36,7 +46,10 @@ class Server:
                         daemon=True
                     )
                     client_thread.start()
+                    self.clients.append((client_socket, client_address))
 
+                except socket.timeout:
+                    continue
                 except socket.error as e:
                     if self.running:
                         Logger.error(f"Client kabul etme hatası: {str(e)}", "Server")
@@ -89,6 +102,8 @@ class Server:
             Logger.error(f"Client işleme hatası: {str(e)}", "Server")
         finally:
             client_socket.close()
+            if (client_socket, client_address) in self.clients:
+                self.clients.remove((client_socket, client_address))
             Logger.info(f"Client bağlantısı kapatıldı: {client_address}", "Server")
 
     def _send_pong(self, client_socket: socket.socket):
@@ -107,6 +122,14 @@ class Server:
 
             Logger.info(f"İşlem talebi: {operation} - {algorithm}", "Server")
 
+            if not data:
+                self._send_error(client_socket, "Veri boş olamaz")
+                return
+
+            if not key and algorithm not in ['polybius']:
+                self._send_error(client_socket, "Anahtar boş olamaz")
+                return
+
             if self.processing_callback:
                 result = self.processing_callback(data, operation, algorithm, key, metadata)
 
@@ -118,16 +141,20 @@ class Server:
                         'timestamp': time.time()
                     }
                     result_packet = DataPacket.create_packet(result['data'], 'RESULT', result_metadata)
-                    client_socket.send(result_packet)
+                    client_socket.sendall(result_packet)
                     Logger.info(f"İşlem tamamlandı: {operation} - {algorithm}", "Server")
                 else:
                     error_msg = result.get('error', 'İşlem başarısız') if result else 'İşlem başarısız'
+                    Logger.warning(f"İşlem başarısız: {error_msg}", "Server")
                     self._send_error(client_socket, error_msg)
             else:
+                Logger.error("ProcessingManager bulunamadı", "Server")
                 self._send_error(client_socket, "ProcessingManager bulunamadı")
 
         except Exception as e:
             Logger.error(f"İşlem hatası: {str(e)}", "Server")
+            import traceback
+            Logger.debug(f"Detaylı hata: {traceback.format_exc()}", "Server")
             self._send_error(client_socket, f"İşlem hatası: {str(e)}")
 
     def _send_error(self, client_socket: socket.socket, error_message: str):
@@ -138,7 +165,7 @@ class Server:
                 'timestamp': time.time()
             }
             error_packet = DataPacket.create_packet(b"", 'ERROR', error_metadata)
-            client_socket.send(error_packet)
+            client_socket.sendall(error_packet)
         except Exception as e:
             Logger.error(f"Hata gönderme hatası: {str(e)}", "Server")
 

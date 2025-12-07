@@ -733,7 +733,7 @@ class ClientWindow:
 
     def show_file_info_display(self, file_info):
 
-        info_text = f
+        info_text = f"Dosya: {file_info.get('filename', 'Bilinmiyor')}\nAlgoritma: {file_info.get('algorithm', 'Bilinmiyor')}\nBoyut: {file_info.get('file_size', 0)} bytes\nOluşturulma: {file_info.get('created_at', 'Bilinmiyor')}"
 
         self.file_info_text.config(state=tk.NORMAL)
         self.file_info_text.delete("1.0", tk.END)
