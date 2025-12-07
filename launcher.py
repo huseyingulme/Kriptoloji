@@ -17,7 +17,6 @@ class LauncherWindow:
         self.create_widgets()
 
     def setup_window(self):
-
         self.root.title("Kriptoloji Projesi - Ana Menü")
         self.root.geometry("600x500")
         self.root.resizable(False, False)
@@ -166,7 +165,6 @@ class LauncherWindow:
             messagebox.showerror("Hata", f"Client başlatılamadı: {str(e)}")
 
     def on_closing(self):
-
         self.root.destroy()
 
 def main():

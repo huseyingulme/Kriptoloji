@@ -4,7 +4,6 @@ import argparse
 from shared.utils import Logger
 
 def start_server(host="localhost", port=12345):
-
     try:
         Logger.info("Server başlatılıyor...", "Main")
         from server.main import main as server_main
@@ -18,7 +17,6 @@ def start_server(host="localhost", port=12345):
         sys.exit(1)
 
 def start_client():
-
     try:
         Logger.info("Client başlatılıyor...", "Main")
         from client.main import main as client_main
@@ -30,7 +28,6 @@ def start_client():
         sys.exit(1)
 
 def main():
-
     parser = argparse.ArgumentParser(description="Kriptoloji Projesi - Şifreleme/Çözme Sistemi")
     parser.add_argument("mode", choices=["server", "client"],
                        help="Çalıştırılacak mod: server veya client")

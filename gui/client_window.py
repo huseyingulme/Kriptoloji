@@ -860,7 +860,7 @@ class ClientWindow:
             y = (info_window.winfo_screenheight() // 2) - (400 // 2)
             info_window.geometry(f"500x400+{x}+{y}")
 
-            info_text = f
+            info_text = f"Dosya: {file_info.get('filename', 'Bilinmiyor')}\nAlgoritma: {file_info.get('algorithm', 'Bilinmiyor')}\nBoyut: {file_info.get('file_size', 0)} bytes\nOluşturulma: {file_info.get('created_at', 'Bilinmiyor')}\nParametreler: {file_info.get('params', {})}"
 
             text_widget = scrolledtext.ScrolledText(
                 info_window,
