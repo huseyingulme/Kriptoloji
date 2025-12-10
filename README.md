@@ -1,1 +1,1 @@
-Kriptoloji Projesi - Şifreleme ve Çözme Sistemi
+# Kriptoloji Projesi - AES, DES ve RSA ile İstemci-Sunucu Şifreleme 

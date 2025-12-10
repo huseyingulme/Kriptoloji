@@ -66,13 +66,27 @@ class ProcessingManager:
             from server.algorithms.PolybiusCipher import PolybiusCipher
             self.algorithms['polybius'] = PolybiusCipher()
 
-            # AES - Gelişmiş şifreleme standardı
+            # AES - Gelişmiş şifreleme standardı (Kütüphaneli)
             from server.algorithms.AESCipher import AESCipher
             self.algorithms['aes'] = AESCipher()
+            self.algorithms['aes_lib'] = AESCipher()  # Kütüphaneli versiyon
 
-            # DES - Veri şifreleme standardı
+            # AES Manual - Kütüphanesiz manuel implementasyon
+            from server.algorithms.AESManual import AESManual
+            self.algorithms['aes_manual'] = AESManual()
+
+            # DES - Veri şifreleme standardı (Kütüphaneli)
             from server.algorithms.DESCipher import DESCipher
             self.algorithms['des'] = DESCipher()
+            self.algorithms['des_lib'] = DESCipher()  # Kütüphaneli versiyon
+
+            # DES Manual - Kütüphanesiz manuel implementasyon
+            from server.algorithms.DESManual import DESManual
+            self.algorithms['des_manual'] = DESManual()
+
+            # RSA - Asimetrik şifreleme (Anahtar dağıtımı için)
+            from server.algorithms.RSACipher import RSACipher
+            self.algorithms['rsa'] = RSACipher()
 
             Logger.info(f"{len(self.algorithms)} algoritma başarıyla kaydedildi", "ProcessingManager")
 
@@ -87,9 +101,12 @@ class ProcessingManager:
         İşlem Adımları:
         1. Algoritmanın kayıtlı olup olmadığını kontrol eder
         2. Anahtar ve veri kontrolü yapar
-        3. Uygun algoritmayı seçer
+        3. Uygun algoritmayı seçer (kütüphaneli/kütüphanesiz mod)
         4. Şifreleme veya deşifreleme işlemini gerçekleştirir
-        5. Sonucu döndürür
+           - ENCRYPT: cipher.encrypt(data, key) çağrılır
+           - DECRYPT: cipher.decrypt(data, key) çağrılır
+        5. Performans ölçümü yapılır ve loglanır
+        6. Sonucu döndürür
         
         Args:
             data: Şifrelenecek/deşifrelenecek veri (bytes)
@@ -126,8 +143,24 @@ class ProcessingManager:
                     'data': None
                 }
 
-            # 4. Algoritmayı seç
-            cipher = self.algorithms[algorithm]
+            # 4. Algoritmayı seç (kütüphaneli/kütüphanesiz mod kontrolü)
+            use_library = metadata.get('use_library', True) if metadata else True
+            
+            # Algoritma adını düzelt (mod seçimine göre)
+            actual_algorithm = algorithm
+            if algorithm in ['aes', 'aes_manual']:
+                actual_algorithm = 'aes_lib' if use_library else 'aes_manual'
+            elif algorithm in ['des', 'des_manual']:
+                actual_algorithm = 'des_lib' if use_library else 'des_manual'
+            
+            if actual_algorithm not in self.algorithms:
+                return {
+                    'success': False,
+                    'error': f"Desteklenmeyen algoritma: {actual_algorithm}",
+                    'data': None
+                }
+            
+            cipher = self.algorithms[actual_algorithm]
 
             # 5. İşlemi gerçekleştir ve süreyi ölç
             start_time = time.time()

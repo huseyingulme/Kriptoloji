@@ -79,6 +79,9 @@ class DESCipher(BaseCipher):
                 iv = os.urandom(8)
                 mode = self._get_mode_object(mode_name, iv)
 
+            # NOT: Python cryptography kütüphanesinde klasik DES yoktur, sadece TripleDES vardır.
+            # Gerçek DES için manuel implementasyonu (DESManual) kullanın.
+            # Bu versiyon TripleDES kullanarak DES benzeri işlevsellik sağlar.
             triple_des_key = des_key * 3
             algorithm = algorithms.TripleDES(triple_des_key)
 
