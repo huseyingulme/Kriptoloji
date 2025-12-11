@@ -9,7 +9,7 @@ güvenli bir şekilde dağıtmak için kullanılır.
 
 import os
 from typing import Tuple, Optional
-from server.algorithms.RSACipher import RSACipher
+from algorithms.RSACipher import RSACipher
 from shared.utils import Logger
 
 

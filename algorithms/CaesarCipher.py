@@ -7,7 +7,7 @@ Bu algoritma, her harfi alfabede belirli bir sayı kadar kaydırarak şifreler.
 Bu algoritma sadece metin şifreleme için kullanılır.
 """
 
-from server.algorithms.BaseCipher import BaseCipher
+from algorithms.BaseCipher import BaseCipher
 
 
 class CaesarCipher(BaseCipher):

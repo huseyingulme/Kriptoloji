@@ -1,4 +1,4 @@
-from server.algorithms.BaseCipher import BaseCipher
+from algorithms.BaseCipher import BaseCipher
 
 class ColumnarTranspositionCipher(BaseCipher):
 

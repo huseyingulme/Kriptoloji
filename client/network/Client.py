@@ -146,6 +146,43 @@ class Client:
             Logger.error(f"Veri gönderme hatası: {str(e)}", "Client")
             return False
 
+    def send_hybrid_packet(self, packet: bytes) -> Optional[Dict[str, Any]]:
+        """
+        Hibrit şifreleme paketini gönderir.
+        
+        Args:
+            packet: Hibrit şifreleme paketi (JSON bytes)
+            
+        Returns:
+            Dict: Server cevabı
+        """
+        if not self.connected:
+            Logger.error("Server bağlantısı yok", "Client")
+            return None
+
+        try:
+            # Hibrit paketi gönder
+            metadata = {'type': 'HYBRID_ENCRYPT', 'timestamp': time.time()}
+            hybrid_packet = DataPacket.create_packet(packet, 'HYBRID_ENCRYPT', metadata)
+            
+            # Büyük verileri parçalara böl
+            if len(hybrid_packet) > 1024:
+                chunks = DataPacket.create_chunked_packet(hybrid_packet, 1024)
+                for i, chunk in enumerate(chunks):
+                    self.socket.send(chunk)
+                    Logger.debug(f"Chunk {i+1}/{len(chunks)} gönderildi", "Client")
+            else:
+                self.socket.send(hybrid_packet)
+
+            Logger.info("Hibrit paket gönderildi", "Client")
+            
+            # Cevap al
+            return self.receive_response()
+
+        except Exception as e:
+            Logger.error(f"Hibrit paket gönderme hatası: {str(e)}", "Client")
+            return None
+
     def receive_response(self) -> Optional[Dict[str, Any]]:
         """
         Server'dan gelen cevabı alır.
@@ -189,7 +226,7 @@ class Client:
                 _, packet_type, metadata = DataPacket.parse_packet(data)
 
             # Başarı kontrolü
-            is_success = packet_type not in ['ERROR', 'FAILED']
+            is_success = packet_type in ['RESULT', 'SUCCESS', 'PONG', 'PUBLIC_KEY'] and packet_type not in ['ERROR', 'FAILED']
             
             # Cevap oluştur
             response = {
@@ -218,7 +255,6 @@ class Client:
             Logger.error(f"Cevap alma hatası: {str(e)}", "Client")
             return None
 
-    @AutoReconnect(max_attempts=5, delay=2.0)
     def process_request(self, data: bytes, operation: str, algorithm: str, key: str,
                       metadata: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """
@@ -237,25 +273,75 @@ class Client:
         Returns:
             Dict: İşlem sonucu
         """
-        # Bağlantı kontrolü
-        if not self.connected:
-            if not self.connect():
-                return None
+        max_attempts = 3
+        attempt = 0
+        
+        while attempt < max_attempts:
+            try:
+                # Bağlantı kontrolü
+                if not self.connected:
+                    if not self.connect():
+                        attempt += 1
+                        if attempt >= max_attempts:
+                            return {
+                                'success': False,
+                                'error': f"Server'a bağlanılamadı. Lütfen server'ın çalıştığından emin olun. (Deneme: {attempt}/{max_attempts})"
+                            }
+                        time.sleep(2.0)
+                        continue
 
-        # İstek gönder
-        if not self.send_request(data, operation, algorithm, key, metadata):
-            if self.auto_reconnect:
-                raise ConnectionError("İstek gönderilemedi")
-            return None
+                # İstek gönder
+                if not self.send_request(data, operation, algorithm, key, metadata):
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        return {
+                            'success': False,
+                            'error': f"İstek gönderilemedi. (Deneme: {attempt}/{max_attempts})"
+                        }
+                    # Bağlantıyı kapat ve yeniden dene
+                    self.disconnect()
+                    time.sleep(2.0)
+                    continue
 
-        # Cevap al
-        response = self.receive_response()
+                # Cevap al
+                response = self.receive_response()
+                
+                if response is None:
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        return {
+                            'success': False,
+                            'error': f"Server'dan cevap alınamadı. (Deneme: {attempt}/{max_attempts})"
+                        }
+                    # Bağlantıyı kapat ve yeniden dene
+                    self.disconnect()
+                    time.sleep(2.0)
+                    continue
 
-        # Callback çağır (varsa)
-        if response and self.response_callback:
-            self.response_callback(response)
+                # Callback çağır (varsa)
+                if response and self.response_callback:
+                    self.response_callback(response)
 
-        return response
+                return response
+                
+            except (ConnectionError, OSError, TimeoutError) as e:
+                attempt += 1
+                Logger.warning(f"Bağlantı hatası (Deneme {attempt}/{max_attempts}): {str(e)}", "Client")
+                
+                if attempt >= max_attempts:
+                    return {
+                        'success': False,
+                        'error': f"Bağlantı hatası: {str(e)}. Maksimum deneme sayısına ulaşıldı ({max_attempts}). Lütfen server'ın çalıştığından emin olun."
+                    }
+                
+                # Bağlantıyı kapat ve yeniden dene
+                self.disconnect()
+                time.sleep(2.0)
+        
+        return {
+            'success': False,
+            'error': f"Maksimum yeniden bağlanma denemesi aşıldı ({max_attempts}). Lütfen server'ın çalıştığından emin olun."
+        }
 
     def set_response_callback(self, callback: Callable):
         """Cevap geldiğinde çağrılacak callback fonksiyonunu ayarlar."""
@@ -299,3 +385,39 @@ class Client:
         except Exception as e:
             Logger.error(f"Ping hatası: {str(e)}", "Client")
             return False
+
+    def request_public_key(self) -> Optional[bytes]:
+        """
+        Server'dan RSA public key talep eder (handshake).
+        
+        Returns:
+            bytes: RSA public key (PEM formatında) veya None
+        """
+        try:
+            if not self.connected:
+                if not self.connect():
+                    return None
+
+            # Handshake paketi gönder
+            handshake_data = b"HANDSHAKE"
+            handshake_metadata = {'type': 'HANDSHAKE', 'timestamp': time.time()}
+            packet = DataPacket.create_packet(handshake_data, 'HANDSHAKE', handshake_metadata)
+
+            self.socket.send(packet)
+
+            # Public key cevabı bekle
+            response = self.socket.recv(8192)  # RSA key için daha büyük buffer
+            if response:
+                data, packet_type, metadata = DataPacket.parse_packet(response)
+                if packet_type == 'PUBLIC_KEY':
+                    Logger.info("RSA public key alındı", "Client")
+                    return data
+                else:
+                    Logger.warning(f"Beklenmeyen paket tipi: {packet_type}", "Client")
+                    return None
+
+            return None
+
+        except Exception as e:
+            Logger.error(f"Handshake hatası: {str(e)}", "Client")
+            return None

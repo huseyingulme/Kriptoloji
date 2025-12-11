@@ -39,59 +39,82 @@ class ProcessingManager:
         """
         try:
             # Caesar Cipher - Klasik kaydırma algoritması
-            from server.algorithms.CaesarCipher import CaesarCipher
+            from algorithms.CaesarCipher import CaesarCipher
             self.algorithms['caesar'] = CaesarCipher()
 
             # Vigenere Cipher - Çoklu anahtar kullanan algoritma
-            from server.algorithms.VigenereCipher import VigenereCipher
+            from algorithms.VigenereCipher import VigenereCipher
             self.algorithms['vigenere'] = VigenereCipher()
 
+            # Affine Cipher - Doğrusal şifreleme algoritması
+            from algorithms.AffineCipher import AffineCipher
+            self.algorithms['affine'] = AffineCipher()
+
             # Hill Cipher - Matris tabanlı şifreleme
-            from server.algorithms.HillCipher import HillCipher
+            from algorithms.HillCipher import HillCipher
             self.algorithms['hill'] = HillCipher()
 
             # Playfair Cipher - İki harfli bloklar kullanan algoritma
-            from server.algorithms.PlayfairCipher import PlayfairCipher
+            from algorithms.PlayfairCipher import PlayfairCipher
             self.algorithms['playfair'] = PlayfairCipher()
 
             # Rail Fence Cipher - Zigzag desenli şifreleme
-            from server.algorithms.RailFenceCipher import RailFenceCipher
+            from algorithms.RailFenceCipher import RailFenceCipher
             self.algorithms['railfence'] = RailFenceCipher()
 
             # Columnar Transposition - Sütun bazlı yer değiştirme
-            from server.algorithms.ColumnarTranspositionCipher import ColumnarTranspositionCipher
+            from algorithms.ColumnarTranspositionCipher import ColumnarTranspositionCipher
             self.algorithms['columnar'] = ColumnarTranspositionCipher()
 
             # Polybius Cipher - Kare tabanlı şifreleme
-            from server.algorithms.PolybiusCipher import PolybiusCipher
+            from algorithms.PolybiusCipher import PolybiusCipher
             self.algorithms['polybius'] = PolybiusCipher()
 
+            # Substitution Cipher - Alfabe karıştırma şifreleme
+            from algorithms.SubstitutionCipher import SubstitutionCipher
+            self.algorithms['substitution'] = SubstitutionCipher()
+
+            # Route Cipher - Rota tabanlı şifreleme
+            from algorithms.RouteCipher import RouteCipher
+            self.algorithms['route'] = RouteCipher()
+
+            # Pigpen Cipher - Sembol tabanlı şifreleme
+            from algorithms.PigpenCipher import PigpenCipher
+            self.algorithms['pigpen'] = PigpenCipher()
+
             # AES - Gelişmiş şifreleme standardı (Kütüphaneli)
-            from server.algorithms.AESCipher import AESCipher
+            from algorithms.AESCipher import AESCipher
             self.algorithms['aes'] = AESCipher()
             self.algorithms['aes_lib'] = AESCipher()  # Kütüphaneli versiyon
 
             # AES Manual - Kütüphanesiz manuel implementasyon
-            from server.algorithms.AESManual import AESManual
+            from algorithms.AESManual import AESManual
             self.algorithms['aes_manual'] = AESManual()
 
             # DES - Veri şifreleme standardı (Kütüphaneli)
-            from server.algorithms.DESCipher import DESCipher
+            from algorithms.DESCipher import DESCipher
             self.algorithms['des'] = DESCipher()
             self.algorithms['des_lib'] = DESCipher()  # Kütüphaneli versiyon
 
             # DES Manual - Kütüphanesiz manuel implementasyon
-            from server.algorithms.DESManual import DESManual
+            from algorithms.DESManual import DESManual
             self.algorithms['des_manual'] = DESManual()
 
-            # RSA - Asimetrik şifreleme (Anahtar dağıtımı için)
-            from server.algorithms.RSACipher import RSACipher
+            # RSA - Asimetrik şifreleme (Anahtar dağıtımı için) - Kütüphaneli
+            from algorithms.RSACipher import RSACipher
             self.algorithms['rsa'] = RSACipher()
+            self.algorithms['rsa_lib'] = RSACipher()
+            
+            # RSA Manual - Kütüphanesiz manuel implementasyon
+            from algorithms.RSAManual import RSAManual
+            self.algorithms['rsa_manual'] = RSAManual()
 
             Logger.info(f"{len(self.algorithms)} algoritma başarıyla kaydedildi", "ProcessingManager")
 
         except Exception as e:
             Logger.error(f"Algoritma kaydetme hatası: {str(e)}", "ProcessingManager")
+            import traceback
+            Logger.debug(f"Detaylı hata: {traceback.format_exc()}", "ProcessingManager")
 
     def process_request(self, data: bytes, operation: str, algorithm: str,
                       key: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -128,7 +151,7 @@ class ProcessingManager:
                 }
 
             # 2. Anahtar kontrolü (Polybius gibi bazı algoritmalar anahtar gerektirmez)
-            if not key and algorithm not in ['polybius']:
+            if not key and algorithm not in ['polybius', 'pigpen']:
                 return {
                     'success': False,
                     'error': "Anahtar boş olamaz",
@@ -152,6 +175,8 @@ class ProcessingManager:
                 actual_algorithm = 'aes_lib' if use_library else 'aes_manual'
             elif algorithm in ['des', 'des_manual']:
                 actual_algorithm = 'des_lib' if use_library else 'des_manual'
+            elif algorithm in ['rsa', 'rsa_manual']:
+                actual_algorithm = 'rsa_lib' if use_library else 'rsa_manual'
             
             if actual_algorithm not in self.algorithms:
                 return {
@@ -170,6 +195,15 @@ class ProcessingManager:
                 result_data = cipher.encrypt(data, key)
                 duration = time.time() - start_time
                 Logger.info(f"Şifreleme tamamlandı: {algorithm} ({duration:.3f}s)", "ProcessingManager")
+                
+                # RSA için "generate" kullanıldıysa private key'i de ekle
+                if algorithm in ['rsa', 'rsa_manual', 'rsa_lib'] and (isinstance(key, str) and (key.lower() == 'generate' or not key or key.strip() == '')):
+                    if hasattr(cipher, '_last_generated_private_key') and cipher._last_generated_private_key:
+                        import base64
+                        private_key_b64 = base64.b64encode(cipher._last_generated_private_key).decode('utf-8')
+                        # Private key'i result_data'ya ekle (özel format)
+                        result_str = result_data.decode('utf-8', errors='ignore') if isinstance(result_data, bytes) else str(result_data)
+                        result_data = f"RSA_PRIVATE_KEY:\n{private_key_b64}\n\nŞİFRELENMİŞ VERİ:\n{result_str}".encode('utf-8')
                 
                 # Performans loglama
                 advanced_logger.log_performance(f"encrypt_{algorithm}", duration, {"data_size": len(data)})

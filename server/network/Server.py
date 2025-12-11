@@ -41,6 +41,8 @@ class Server:
         self.running = False
         self.clients = []  # Bağlı client'ların listesi
         self.processing_callback: Optional[Callable] = None  # Şifreleme işlemlerini yapan callback
+        self.key_manager = None  # RSA anahtar yönetimi
+        self.hybrid_decryption_manager = None  # Hibrit çözme yöneticisi
         self.max_clients = config_manager.get("server.max_clients", 10)
         self.timeout = config_manager.get("server.timeout", 30)
 
@@ -135,6 +137,16 @@ class Server:
                         self._send_pong(client_socket)
                         continue
 
+                    # HANDSHAKE isteği - RSA public key talep etmek için
+                    if packet_type == 'HANDSHAKE':
+                        self._send_public_key(client_socket)
+                        continue
+
+                    # HYBRID_ENCRYPT isteği - Hibrit şifreleme paketi
+                    if packet_type == 'HYBRID_ENCRYPT':
+                        self._process_hybrid_request(client_socket, packet_data)
+                        continue
+
                     # Parçalı veri ise birleştir
                     if packet_type == 'CHUNK':
                         chunks = [data]
@@ -149,6 +161,7 @@ class Server:
                     # Şifreleme/deşifreleme isteği
                     if packet_type in ['ENCRYPT', 'DECRYPT']:
                         self._process_request(client_socket, packet_data, packet_type, metadata)
+                        continue
                     else:
                         Logger.warning(f"Bilinmeyen paket tipi: {packet_type}", "Server")
 
@@ -173,6 +186,53 @@ class Server:
             client_socket.send(pong_packet)
         except Exception as e:
             Logger.error(f"Pong gönderme hatası: {str(e)}", "Server")
+
+    def _send_public_key(self, client_socket: socket.socket):
+        """HANDSHAKE isteğine RSA public key gönderir."""
+        try:
+            if not self.key_manager:
+                self._send_error(client_socket, "Key manager bulunamadı")
+                return
+            
+            public_key = self.key_manager.get_server_public_key()
+            key_metadata = {
+                'type': 'PUBLIC_KEY',
+                'timestamp': time.time(),
+                'key_size': 2048
+            }
+            key_packet = DataPacket.create_packet(public_key, 'PUBLIC_KEY', key_metadata)
+            client_socket.sendall(key_packet)
+            Logger.info("RSA public key gönderildi", "Server")
+        except Exception as e:
+            Logger.error(f"Public key gönderme hatası: {str(e)}", "Server")
+            self._send_error(client_socket, f"Public key gönderme hatası: {str(e)}")
+
+    def _process_hybrid_request(self, client_socket: socket.socket, packet: bytes):
+        """Hibrit şifreleme paketini işler."""
+        try:
+            if not self.hybrid_decryption_manager:
+                self._send_error(client_socket, "Hibrit çözme yöneticisi bulunamadı")
+                return
+
+            # Hibrit paketi çöz
+            decrypted_message = self.hybrid_decryption_manager.decrypt_message(packet)
+            
+            # Başarılı sonuç
+            result_metadata = {
+                'type': 'RESULT',
+                'algorithm': 'hybrid',
+                'operation': 'DECRYPT',
+                'timestamp': time.time()
+            }
+            result_packet = DataPacket.create_packet(decrypted_message, 'RESULT', result_metadata)
+            client_socket.sendall(result_packet)
+            Logger.info("Hibrit paket çözüldü", "Server")
+            
+        except Exception as e:
+            Logger.error(f"Hibrit paket işleme hatası: {str(e)}", "Server")
+            import traceback
+            Logger.debug(f"Detaylı hata: {traceback.format_exc()}", "Server")
+            self._send_error(client_socket, f"Hibrit paket işleme hatası: {str(e)}")
 
     def _process_request(self, client_socket: socket.socket, data: bytes,
                         operation: str, metadata: Dict[str, Any]):
@@ -253,6 +313,13 @@ class Server:
         Bu callback genellikle ProcessingManager.process_request olur.
         """
         self.processing_callback = callback
+
+    def set_key_manager(self, key_manager):
+        """RSA anahtar yönetimini ayarlar."""
+        self.key_manager = key_manager
+        if key_manager:
+            from server.hybrid_decryption import HybridDecryptionManager
+            self.hybrid_decryption_manager = HybridDecryptionManager(key_manager)
 
     def get_client_count(self) -> int:
         """Bağlı client sayısını döndürür."""
