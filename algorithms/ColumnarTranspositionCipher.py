@@ -1,23 +1,36 @@
 from algorithms.BaseCipher import BaseCipher
 
+
 class ColumnarTranspositionCipher(BaseCipher):
+    """
+    Columnar Transposition (Sütunlu Yer Değiştirme) Şifreleme Algoritması.
+
+    Mantık:
+        - Anahtar kelimedeki harflerin alfabetik sırası belirlenir.
+        - Metin satırlara ayrılır, sütunlar anahtar sırasına göre okunur.
+    """
 
     def __init__(self):
         super().__init__()
         self.name = "Columnar Transposition Cipher"
-        self.description = "Sütunlu kaydırma tabanlı aktarım şifrelemesi"
+        self.description = "Sütunlu yer değiştirme tabanlı klasik şifreleme"
         self.key_type = "string"
         self.min_key_length = 1
         self.max_key_length = 20
         self.key_description = "Anahtar kelime (sütun sırasını belirler)"
 
-    def encrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            text = data.decode('utf-8', errors='ignore').upper()
-            key = key.upper()
+    # ----------------------------------------------------------------------
 
-            if not key:
-                raise ValueError("Anahtar boş olamaz")
+    def encrypt(self, data: bytes, key: str) -> bytes:
+        """
+        Columnar transposition ile şifreleme.
+        """
+        try:
+            key = key.strip().upper()
+            if not self.validate_key(key):
+                raise ValueError("Geçersiz anahtar.")
+
+            text = data.decode("utf-8", errors="ignore").replace(" ", "").upper()
 
             if len(text) == 0:
                 return b""
@@ -25,32 +38,39 @@ class ColumnarTranspositionCipher(BaseCipher):
             key_order = self._get_key_order(key)
             num_cols = len(key_order)
 
-            while len(text) % num_cols != 0:
-                text += 'X'
+            # Metni sütun sayısına tamamla
+            padding = (num_cols - (len(text) % num_cols)) % num_cols
+            text += "X" * padding
 
-            matrix = []
-            for i in range(0, len(text), num_cols):
-                matrix.append(list(text[i:i + num_cols]))
+            # Matris oluştur
+            matrix = [
+                list(text[i:i + num_cols])
+                for i in range(0, len(text), num_cols)
+            ]
 
-            result = ""
+            # Sütunları anahtar sırasına göre oku
+            encrypted = ""
             for col in key_order:
                 for row in matrix:
-                    if col < len(row):
-                        result += row[col]
+                    encrypted += row[col]
 
-            return result.encode('utf-8')
+            return encrypted.encode("utf-8")
 
         except Exception as e:
             raise Exception(f"Şifreleme hatası: {str(e)}")
 
+    # ----------------------------------------------------------------------
+
     def decrypt(self, data: bytes, key: str) -> bytes:
+        """
+        Columnar transposition çözme işlemi.
+        """
         try:
-            text = data.decode('utf-8', errors='ignore').upper()
-            key = key.upper()
+            key = key.strip().upper()
+            if not self.validate_key(key):
+                raise ValueError("Geçersiz anahtar.")
 
-            if not key:
-                raise ValueError("Anahtar boş olamaz")
-
+            text = data.decode("utf-8", errors="ignore").upper()
             if len(text) == 0:
                 return b""
 
@@ -58,48 +78,59 @@ class ColumnarTranspositionCipher(BaseCipher):
             num_cols = len(key_order)
             num_rows = len(text) // num_cols
 
+            # Boş matris oluştur
             matrix = [[''] * num_cols for _ in range(num_rows)]
 
-            text_index = 0
+            # Sütunları sırayla doldur
+            index = 0
             for col in key_order:
                 for row in range(num_rows):
-                    if text_index < len(text):
-                        matrix[row][col] = text[text_index]
-                        text_index += 1
+                    matrix[row][col] = text[index]
+                    index += 1
 
-            result = ""
-            for row in matrix:
-                result += ''.join(row)
+            # Satır satır oku
+            decrypted = "".join("".join(row) for row in matrix)
 
-            while result.endswith('X'):
-                result = result[:-1]
+            # X padlerini temizle (sadece sondakileri)
+            decrypted = decrypted.rstrip("X")
 
-            return result.encode('utf-8')
+            return decrypted.encode("utf-8")
 
         except Exception as e:
             raise Exception(f"Çözme hatası: {str(e)}")
 
+    # ----------------------------------------------------------------------
+
     def _get_key_order(self, key: str) -> list:
-        key_chars = list(key)
-        sorted_key = sorted(key_chars)
+        """
+        Anahtar kelimeyi alfabetik olarak sıralayıp,
+        harflerin gerçek pozisyonlarını döndürür.
+        """
+        indexed_chars = list(enumerate(key))
+        # Örn: "ZEBRA" → [(0,'Z'), (1,'E'), (2,'B'), ...]
 
-        order = []
-        used_positions = set()
+        # Harfleri alfabetik sıraya göre, index eşitliklerinde index sırasına göre sırala
+        sorted_chars = sorted(indexed_chars, key=lambda x: (x[1], x[0]))
 
-        for char in sorted_key:
-            for i, key_char in enumerate(key_chars):
-                if key_char == char and i not in used_positions:
-                    order.append(i)
-                    used_positions.add(i)
-                    break
+        # Yeni sıralamadaki sütun indexleri
+        return [pair[0] for pair in sorted_chars]
 
-        return order
+    # ----------------------------------------------------------------------
 
     def validate_key(self, key: str) -> bool:
+        """
+        Key doğrulama:
+        - boş olamaz
+        - sadece harflerden oluşabilir
+        - uzunluk sınırına uymalı
+        """
         if not key:
             return False
 
-        if len(key) < self.min_key_length or len(key) > self.max_key_length:
+        if not key.isalpha():
+            return False
+
+        if not (self.min_key_length <= len(key) <= self.max_key_length):
             return False
 
         return True

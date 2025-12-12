@@ -4,9 +4,10 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding, hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.exceptions import InvalidTag
 import os
 import hashlib
-import base64 # base64 kullanılmamış ama import edilmiş, bu sürümde kaldırılmıştır.
+import base64
 
 class AESCipher(BaseCipher):
 
@@ -210,7 +211,7 @@ class AESCipher(BaseCipher):
 
             return result
 
-        except modes.InvalidTag:
+        except InvalidTag:
             # GCM veya diğer Authenticated Encryption modlarında kimlik doğrulama hatası
             raise Exception("Deşifreleme hatası: Kimlik doğrulama (Authentication Tag) başarısız.")
         except ValueError as e:

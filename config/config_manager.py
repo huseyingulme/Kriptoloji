@@ -73,7 +73,8 @@ class ConfigManager:
                 "enable_digital_signature": True,
                 "enable_key_sharing": True,
                 "enable_benchmark": True,
-                "enable_history": True
+                "enable_history": True,
+                "wireshark_mode": os.getenv("KRIPTO_WIRESHARK_MODE", "false").lower() == "true"
             }
         }
     

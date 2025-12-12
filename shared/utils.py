@@ -7,10 +7,60 @@ from typing import Dict, Any, Tuple, List
 class DataPacket:
 
     @staticmethod
-    def create_packet(data: bytes, packet_type: str, metadata: Dict[str, Any] = None) -> bytes:
+    def create_packet(data: bytes, packet_type: str, metadata: Dict[str, Any] = None, use_json_format: bool = False) -> bytes:
+        """
+        Paket oluşturur.
+        
+        Args:
+            data: Gönderilecek veri (bytes)
+            packet_type: Paket tipi (ENCRYPT, DECRYPT, vb.)
+            metadata: Ek metadata bilgileri
+            use_json_format: True ise Wireshark için JSON formatında gönderir
+        
+        Returns:
+            bytes: Oluşturulan paket
+        """
         if metadata is None:
             metadata = {}
 
+        # Wireshark modu: JSON formatında açık metin gönder
+        if use_json_format:
+            # Veriyi string'e çevir (base64 encode edilmiş olabilir)
+            try:
+                message_str = data.decode('utf-8', errors='ignore')
+            except:
+                import base64
+                message_str = base64.b64encode(data).decode('utf-8')
+            
+            # JSON paket oluştur (Wireshark uyumlu format)
+            # Format: {"operation":"ENCRYPT/DECRYPT","message":"...","algorithm":"...","key":"...","timestamp":...}
+            # Alan sırası: operation, message, algorithm, key, timestamp (diğer alanlar sonra)
+            json_packet = {}
+            
+            # Zorunlu alanlar (sıralı)
+            json_packet["operation"] = packet_type  # ENCRYPT, DECRYPT, PING, HANDSHAKE, vb.
+            json_packet["message"] = message_str
+            json_packet["algorithm"] = metadata.get('algorithm', '')
+            json_packet["key"] = metadata.get('key', '')
+            json_packet["timestamp"] = metadata.get('timestamp', 0)
+            
+            # Ek metadata bilgilerini ekle (sadece önemli olanlar, alfabetik sırada)
+            extra_keys = []
+            for key, value in metadata.items():
+                if key not in ['algorithm', 'key', 'timestamp', 'type'] and value:
+                    # Sadece string, number, bool gibi JSON uyumlu değerleri ekle
+                    if isinstance(value, (str, int, float, bool)):
+                        extra_keys.append((key, value))
+            
+            # Ek alanları alfabetik sırada ekle
+            for key, value in sorted(extra_keys):
+                json_packet[key] = value
+            
+            # JSON string (compact format, Wireshark için optimize edilmiş)
+            json_str = json.dumps(json_packet, ensure_ascii=False, separators=(',', ':'))
+            return json_str.encode('utf-8')
+
+        # Normal mod: Binary paket formatı
         metadata_json = json.dumps(metadata).encode('utf-8')
         metadata_size = len(metadata_json)
 
@@ -21,7 +71,61 @@ class DataPacket:
         return packet
 
     @staticmethod
-    def parse_packet(packet: bytes) -> Tuple[bytes, str, Dict[str, Any]]:
+    def parse_packet(packet: bytes, use_json_format: bool = False) -> Tuple[bytes, str, Dict[str, Any]]:
+        """
+        Paketi parse eder.
+        
+        Args:
+            packet: Parse edilecek paket (bytes)
+            use_json_format: True ise JSON formatında paket beklenir
+        
+        Returns:
+            Tuple[bytes, str, Dict]: (data, packet_type, metadata)
+        """
+        # Wireshark modu: JSON formatında paket
+        if use_json_format:
+            try:
+                # JSON parse et (newline varsa kaldır)
+                packet_str = packet.decode('utf-8').strip()
+                json_data = json.loads(packet_str)
+                
+                # JSON'dan bilgileri çıkar (Wireshark uyumlu format)
+                # Format: {"operation": "ENCRYPT/DECRYPT", "message": "...", "algorithm": "...", "key": "...", "timestamp": ...}
+                message_str = json_data.get('message', '')
+                algorithm = json_data.get('algorithm', '')
+                key = json_data.get('key', '')
+                
+                # Mesajı bytes'a çevir
+                try:
+                    data = message_str.encode('utf-8')
+                except:
+                    import base64
+                    try:
+                        data = base64.b64decode(message_str)
+                    except:
+                        data = message_str.encode('utf-8', errors='ignore')
+                
+                # Paket tipini belirle (operation'dan al, yoksa type'dan, yoksa default ENCRYPT)
+                packet_type = json_data.get('operation') or json_data.get('type', 'ENCRYPT')
+                
+                # Metadata oluştur (mevcut sistemle uyumlu)
+                metadata = {
+                    'type': packet_type,
+                    'algorithm': algorithm,
+                    'key': key,
+                    'timestamp': json_data.get('timestamp', 0)
+                }
+                
+                # Ek metadata bilgilerini ekle
+                for key, value in json_data.items():
+                    if key not in ['operation', 'message', 'algorithm', 'key', 'timestamp', 'type']:
+                        metadata[key] = value
+                
+                return data, packet_type, metadata
+            except json.JSONDecodeError as e:
+                raise ValueError(f"JSON parse hatası: {str(e)}")
+
+        # Normal mod: Binary paket formatı
         if len(packet) < 8:
             raise ValueError("Geçersiz paket boyutu")
 
@@ -54,6 +158,48 @@ class DataPacket:
             chunks.append(chunk)
 
         return chunks
+
+    @staticmethod
+    def create_json_response(result_data: bytes, packet_type: str, algorithm: str, success: bool = True, error: str = None) -> bytes:
+        """
+        Wireshark için JSON formatında cevap paketi oluşturur.
+        
+        Args:
+            result_data: Sonuç verisi (bytes)
+            packet_type: Paket tipi (RESULT, ERROR, vb.)
+            algorithm: Kullanılan algoritma
+            success: İşlem başarılı mı?
+            error: Hata mesajı (varsa)
+        
+        Returns:
+            bytes: JSON formatında cevap paketi
+        """
+        try:
+            result_str = result_data.decode('utf-8', errors='ignore')
+        except:
+            import base64
+            result_str = base64.b64encode(result_data).decode('utf-8')
+        
+        # Wireshark uyumlu cevap formatı
+        # Format: {"operation":"RESULT/ERROR","message":"...","algorithm":"...","success":true/false,"timestamp":...}
+        # Alan sırası: operation, message, algorithm, success, timestamp, error (varsa)
+        import time
+        json_response = {}
+        
+        # Zorunlu alanlar (sıralı)
+        json_response["operation"] = packet_type  # RESULT, ERROR, vb.
+        json_response["message"] = result_str
+        json_response["algorithm"] = algorithm
+        json_response["success"] = success
+        json_response["timestamp"] = time.time()
+        
+        # Hata varsa ekle
+        if not success and error:
+            json_response["error"] = error
+        
+        # JSON string (compact format, Wireshark için optimize edilmiş)
+        json_str = json.dumps(json_response, ensure_ascii=False, separators=(',', ':'))
+        return json_str.encode('utf-8')
 
     @staticmethod
     def reassemble_chunks(chunks: List[bytes]) -> bytes:

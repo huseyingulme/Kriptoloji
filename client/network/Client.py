@@ -15,6 +15,9 @@ from shared.utils import DataPacket, Logger
 from shared.error_handler import ErrorHandler, AutoReconnect
 from config import config_manager
 
+# Wireshark modunu kontrol et
+WIRESHARK_MODE = config_manager.get("features.wireshark_mode", False)
+
 
 class Client:
     """
@@ -124,20 +127,25 @@ class Client:
                 'timestamp': time.time()
             })
 
-            # Paket oluştur
-            packet = DataPacket.create_packet(data, operation, metadata)
+            # Paket oluştur (Wireshark modu kontrolü)
+            packet = DataPacket.create_packet(data, operation, metadata, use_json_format=WIRESHARK_MODE)
 
-            # Büyük verileri parçalara böl (1024 byte'dan büyükse)
-            if len(packet) > 1024:
-                chunks = DataPacket.create_chunked_packet(packet, 1024)
-                
-                # Her parçayı sırayla gönder
-                for i, chunk in enumerate(chunks):
-                    self.socket.send(chunk)
-                    Logger.debug(f"Chunk {i+1}/{len(chunks)} gönderildi", "Client")
+            # Wireshark modunda JSON formatında gönder (büyük verileri parçalara bölme)
+            if WIRESHARK_MODE:
+                self.socket.sendall(packet)
+                Logger.info(f"[WIRESHARK MODE] JSON paket gönderildi: {packet.decode('utf-8', errors='ignore')[:200]}...", "Client")
             else:
-                # Küçük verileri direkt gönder
-                self.socket.send(packet)
+                # Büyük verileri parçalara böl (1024 byte'dan büyükse)
+                if len(packet) > 1024:
+                    chunks = DataPacket.create_chunked_packet(packet, 1024)
+                    
+                    # Her parçayı sırayla gönder
+                    for i, chunk in enumerate(chunks):
+                        self.socket.send(chunk)
+                        Logger.debug(f"Chunk {i+1}/{len(chunks)} gönderildi", "Client")
+                else:
+                    # Küçük verileri direkt gönder
+                    self.socket.send(packet)
 
             Logger.info(f"İşlem talebi gönderildi: {operation} - {algorithm}", "Client")
             return True
@@ -208,11 +216,14 @@ class Client:
                 Logger.warning("Server'dan boş cevap alındı", "Client")
                 return None
 
-            # Paketi parse et
-            data, packet_type, metadata = DataPacket.parse_packet(response_data)
+            # Paketi parse et (Wireshark modu kontrolü)
+            data, packet_type, metadata = DataPacket.parse_packet(response_data, use_json_format=WIRESHARK_MODE)
+            
+            if WIRESHARK_MODE:
+                Logger.info(f"[WIRESHARK MODE] JSON cevap alındı: {response_data.decode('utf-8', errors='ignore')[:200]}...", "Client")
 
-            # Parçalı veri ise birleştir
-            if packet_type == 'CHUNK':
+            # Parçalı veri ise birleştir (Wireshark modunda chunking yok)
+            if packet_type == 'CHUNK' and not WIRESHARK_MODE:
                 chunks = [response_data]
                 
                 # Tüm parçaları al
@@ -370,14 +381,14 @@ class Client:
             # Ping paketi gönder
             ping_data = b"PING"
             ping_metadata = {'type': 'PING', 'timestamp': time.time()}
-            packet = DataPacket.create_packet(ping_data, 'PING', ping_metadata)
+            packet = DataPacket.create_packet(ping_data, 'PING', ping_metadata, use_json_format=WIRESHARK_MODE)
 
             self.socket.send(packet)
 
             # Pong cevabı bekle
             response = self.socket.recv(1024)
             if response:
-                _, packet_type, _ = DataPacket.parse_packet(response)
+                _, packet_type, _ = DataPacket.parse_packet(response, use_json_format=WIRESHARK_MODE)
                 return packet_type == 'PONG'
 
             return False
@@ -401,14 +412,14 @@ class Client:
             # Handshake paketi gönder
             handshake_data = b"HANDSHAKE"
             handshake_metadata = {'type': 'HANDSHAKE', 'timestamp': time.time()}
-            packet = DataPacket.create_packet(handshake_data, 'HANDSHAKE', handshake_metadata)
+            packet = DataPacket.create_packet(handshake_data, 'HANDSHAKE', handshake_metadata, use_json_format=WIRESHARK_MODE)
 
             self.socket.send(packet)
 
             # Public key cevabı bekle
             response = self.socket.recv(8192)  # RSA key için daha büyük buffer
             if response:
-                data, packet_type, metadata = DataPacket.parse_packet(response)
+                data, packet_type, metadata = DataPacket.parse_packet(response, use_json_format=WIRESHARK_MODE)
                 if packet_type == 'PUBLIC_KEY':
                     Logger.info("RSA public key alındı", "Client")
                     return data

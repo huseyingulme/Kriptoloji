@@ -399,55 +399,119 @@ class MainWindow:
 
                 self.root.after(0, lambda: self.progress_var.set(30))
                 
-                # Çözme işlemi için hex string kontrolü
+                # Çözme işlemi için hex ve base64 string kontrolü
                 if operation == "DECRYPT":
-                    # Önce "Hex Formatı:" etiketini kontrol et
-                    if "Hex Formatı:" in process_text or "Hex Format:" in process_text:
-                        # Hex formatından hex string'i çıkar
-                        lines = text.split('\n')
-                        hex_line = None
+                    import base64 as b64
+                    
+                    # Klasik şifreleme algoritmaları listesi (boşlukları korumalı)
+                    classic_algorithms = ['caesar', 'caesar_cipher', 'vigenere', 'vigenere_cipher', 
+                                         'substitution', 'substitution_cipher', 'affine', 'affine_cipher',
+                                         'playfair', 'playfair_cipher', 'hill', 'hill_cipher',
+                                         'polybius', 'polybius_cipher', 'railfence', 'rail_fence',
+                                         'route', 'route_cipher', 'pigpen', 'pigpen_cipher']
+                    is_classic_algorithm = algorithm.lower() in classic_algorithms
+                    
+                    # Önce "Hex Formatı:" veya "Base64" etiketini kontrol et (öncelikli)
+                    if "Hex Formatı:" in process_text or "Hex Format:" in process_text or "Base64" in process_text or "base64" in process_text.lower():
+                        # Format etiketinden string'i çıkar
+                        lines = process_text.split('\n')
+                        extracted_line = None
                         for i, line in enumerate(lines):
-                            if "Hex Format" in line or "hex" in line.lower():
-                                # Sonraki satır hex string olabilir
+                            line_lower = line.lower()
+                            if "hex format" in line_lower or "base64" in line_lower:
+                                # Sonraki satır hex/base64 string olabilir
                                 if i + 1 < len(lines):
-                                    hex_line = lines[i + 1].strip()
+                                    extracted_line = lines[i + 1].strip()
                                     break
                                 # Veya aynı satırda olabilir
                                 parts = line.split(':', 1)
                                 if len(parts) > 1:
-                                    hex_line = parts[1].strip()
+                                    extracted_line = parts[1].strip()
                                     break
                         
-                        if hex_line:
-                            process_text = hex_line
-                    
-                    # Hex string kontrolü (sadece 0-9, a-f, A-F karakterleri)
-                    text_clean = process_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
-                    
-                    # Eğer "Şifrelenmiş Metin:" gibi etiketler varsa temizle
-                    if ":" in text_clean:
-                        parts = text_clean.split(":")
-                        if len(parts) > 1:
-                            text_clean = parts[-1]
-                    
-                    # Hex karakter kontrolü
-                    if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
-                        try:
-                            data = bytes.fromhex(text_clean)
-                            Logger.info(f"Hex string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
-                        except ValueError as e:
-                            Logger.warning(f"Hex parse hatası: {str(e)}, normal text olarak işleniyor", "MainWindow")
-                            # Hex değilse normal text olarak işle
-                            data = process_text.encode('utf-8')
+                        if extracted_line:
+                            process_text = extracted_line
                     else:
-                        # Normal text olarak işle (şifrelenmiş bytes olabilir)
-                        try:
-                            # Önce UTF-8 olarak decode etmeyi dene
-                            data = process_text.encode('utf-8')
-                            Logger.info(f"Text olarak encode edildi: {len(data)} byte", "MainWindow")
-                        except Exception as e:
-                            Logger.error(f"Text encode hatası: {str(e)}", "MainWindow")
-                            data = process_text.encode('utf-8', errors='ignore')
+                        # "Hex Formatı:" yoksa "Şifrelenmiş Metin:" etiketini kontrol et (klasik algoritmalar için)
+                        if "Şifrelenmiş Metin:" in process_text and is_classic_algorithm:
+                            lines = process_text.split('\n')
+                            for i, line in enumerate(lines):
+                                if "Şifrelenmiş Metin:" in line:
+                                    if i + 1 < len(lines) and lines[i + 1].strip():
+                                        extracted_text = lines[i + 1].strip()
+                                        process_text = extracted_text
+                                        Logger.info(f"Klasik algoritma için 'Şifrelenmiş Metin:' etiketinden metin çıkarıldı: {extracted_text}", "MainWindow")
+                                        break
+                    
+                    # Klasik algoritmalar için: Metin sadece harfler/boşluklar içeriyorsa direkt kullan
+                    if is_classic_algorithm:
+                        # Metni temizle ama boşlukları koru
+                        clean_text = process_text.strip()
+                        # Eğer sadece harfler, boşluklar ve noktalama işaretleri varsa direkt kullan
+                        if all(c.isalpha() or c.isspace() or c in '.,!?;:-\'"()[]{}' for c in clean_text):
+                            data = clean_text.encode('utf-8')
+                            Logger.info(f"Klasik algoritma için metin direkt kullanıldı (boşluklar korundu): {len(data)} byte", "MainWindow")
+                        else:
+                            # Hex/Base64 kontrolü yap (boşlukları kaldırarak)
+                            text_clean = clean_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
+                            # Base64 kontrolü
+                            is_base64 = False
+                            if len(text_clean) > 0:
+                                base64_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+                                if all(c in base64_chars for c in text_clean) and len(text_clean) % 4 == 0:
+                                    try:
+                                        data = b64.b64decode(text_clean)
+                                        Logger.info(f"Base64 string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
+                                        is_base64 = True
+                                    except Exception as e:
+                                        Logger.warning(f"Base64 parse hatası: {str(e)}, hex kontrolüne geçiliyor", "MainWindow")
+                            
+                            # Hex kontrolü
+                            if not is_base64:
+                                if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
+                                    try:
+                                        data = bytes.fromhex(text_clean)
+                                        Logger.info(f"Hex string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
+                                    except ValueError as e:
+                                        Logger.warning(f"Hex parse hatası: {str(e)}, normal text olarak işleniyor", "MainWindow")
+                                        data = clean_text.encode('utf-8')
+                                else:
+                                    data = clean_text.encode('utf-8')
+                                    Logger.info(f"Text olarak encode edildi: {len(data)} byte", "MainWindow")
+                    else:
+                        # Modern algoritmalar için: Boşlukları kaldır ve hex/base64 parse et
+                        text_clean = process_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
+                        
+                        # Eğer "Şifrelenmiş Metin:" gibi etiketler varsa temizle
+                        if ":" in text_clean:
+                            parts = text_clean.split(":")
+                            if len(parts) > 1:
+                                text_clean = parts[-1]
+                        
+                        # Base64 kontrolü
+                        is_base64 = False
+                        if len(text_clean) > 0:
+                            base64_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+                            if all(c in base64_chars for c in text_clean) and len(text_clean) % 4 == 0:
+                                try:
+                                    data = b64.b64decode(text_clean)
+                                    Logger.info(f"Base64 string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
+                                    is_base64 = True
+                                except Exception as e:
+                                    Logger.warning(f"Base64 parse hatası: {str(e)}, hex kontrolüne geçiliyor", "MainWindow")
+                        
+                        # Hex kontrolü
+                        if not is_base64:
+                            if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
+                                try:
+                                    data = bytes.fromhex(text_clean)
+                                    Logger.info(f"Hex string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
+                                except ValueError as e:
+                                    Logger.warning(f"Hex parse hatası: {str(e)}, normal text olarak işleniyor", "MainWindow")
+                                    data = process_text.encode('utf-8')
+                            else:
+                                data = process_text.encode('utf-8')
+                                Logger.info(f"Text olarak encode edildi: {len(data)} byte", "MainWindow")
                 else:
                     # Şifreleme için normal encode
                     data = process_text.encode('utf-8')

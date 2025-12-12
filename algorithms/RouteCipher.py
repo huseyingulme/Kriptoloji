@@ -1,278 +1,217 @@
 """
 Route Cipher - Rota Tabanlı Şifreleme
-
-Metin bir matrise yerleştirilir ve belirli bir rota (spiral, satır, sütun, diagonal) 
+Metin bir matrise yerleştirilir ve belirli bir rota (spiral, row, column, diagonal)
 izlenerek okunur.
 """
 
 from algorithms.BaseCipher import BaseCipher
-import math
 
 
 class RouteCipher(BaseCipher):
-    """
-    Route Cipher - Rota tabanlı şifreleme.
-    
-    Metin bir matrise yerleştirilir ve belirli bir rota izlenerek okunur.
-    """
-    
+
     def __init__(self):
         super().__init__()
         self.name = "Route Cipher"
-        self.description = "Rota tabanlı şifreleme - Matris içinde belirli rota izlenerek okuma"
+        self.description = "Matris içinde seçilen rota ile okuma tabanlı şifreleme"
         self.key_type = "string"
         self.min_key_length = 3
         self.max_key_length = 20
-        self.key_description = "Format: 'rows:cols:route_type' (örn: '3:3:spiral', '4:4:row', '3:3:column', '3:3:diagonal'). Route types: spiral, row, column, diagonal"
+        self.key_description = (
+            "Format: rows:cols:type -> Örnek: 3:3:spiral, 4:4:row, 3:3:column"
+        )
         self.supports_binary = False
-    
+
+    # --------------------------------------------------------------
+    # INTERNAL HELPERS
+    # --------------------------------------------------------------
+
     def _parse_key(self, key: str) -> tuple:
-        """Anahtarı parse eder: rows:cols:route_type"""
         try:
-            parts = key.split(':')
+            parts = key.split(":")
             if len(parts) != 3:
-                raise ValueError("Anahtar formatı: 'rows:cols:route_type'")
-            
+                raise ValueError("Anahtar formatı 'rows:cols:route_type' olmalıdır.")
+
             rows = int(parts[0])
             cols = int(parts[1])
             route_type = parts[2].lower()
-            
+
             if rows < 2 or cols < 2:
-                raise ValueError("Satır ve sütun sayısı en az 2 olmalı")
-            
-            if route_type not in ['spiral', 'row', 'column', 'diagonal']:
-                raise ValueError("Rota tipi: spiral, row, column, diagonal olmalı")
-            
+                raise ValueError("Satır/sütun en az 2 olmalıdır.")
+
+            if route_type not in ("spiral", "row", "column", "diagonal"):
+                raise ValueError("Rota spiral, row, column veya diagonal olabilir.")
+
             return rows, cols, route_type
-        
+
         except Exception as e:
             raise ValueError(f"Anahtar parse hatası: {str(e)}")
-    
-    def _spiral_read(self, matrix: list, rows: int, cols: int) -> str:
-        """Spiral rota ile okur (saat yönünde dıştan içe)."""
+
+    # --------------------------------------------------------------
+    # MATRIX OPERATIONS
+    # --------------------------------------------------------------
+
+    def _fill_matrix_rowwise(self, text, rows, cols):
+        """Matris satır satır doldurulur."""
+        matrix = [["" for _ in range(cols)] for _ in range(rows)]
+        idx = 0
+        for r in range(rows):
+            for c in range(cols):
+                matrix[r][c] = text[idx] if idx < len(text) else ""
+                idx += 1
+        return matrix
+
+    def _read_matrix_rowwise(self, matrix, rows, cols):
+        """Matris satır satır okunur."""
+        return "".join(matrix[r][c] for r in range(rows) for c in range(cols))
+
+    # --------------------------------------------------------------
+    # ROUTE READERS
+    # --------------------------------------------------------------
+
+    def _read_spiral(self, matrix, rows, cols):
         result = []
         top, bottom = 0, rows - 1
         left, right = 0, cols - 1
-        
+
         while top <= bottom and left <= right:
-            # Sağa
-            for i in range(left, right + 1):
-                if matrix[top][i] != ' ':
-                    result.append(matrix[top][i])
+
+            for c in range(left, right + 1):
+                result.append(matrix[top][c])
             top += 1
-            
-            # Aşağı
-            for i in range(top, bottom + 1):
-                if matrix[i][right] != ' ':
-                    result.append(matrix[i][right])
+
+            for r in range(top, bottom + 1):
+                result.append(matrix[r][right])
             right -= 1
-            
-            # Sola
+
             if top <= bottom:
-                for i in range(right, left - 1, -1):
-                    if matrix[bottom][i] != ' ':
-                        result.append(matrix[bottom][i])
+                for c in range(right, left - 1, -1):
+                    result.append(matrix[bottom][c])
                 bottom -= 1
-            
-            # Yukarı
+
             if left <= right:
-                for i in range(bottom, top - 1, -1):
-                    if matrix[i][left] != ' ':
-                        result.append(matrix[i][left])
+                for r in range(bottom, top - 1, -1):
+                    result.append(matrix[r][left])
                 left += 1
-        
-        return ''.join(result)
-    
-    def _spiral_write(self, text: str, rows: int, cols: int) -> list:
-        """Spiral rota ile yazar (saat yönünde dıştan içe)."""
-        matrix = [[' ' for _ in range(cols)] for _ in range(rows)]
-        text_idx = 0
+
+        return "".join(result)
+
+    def _write_spiral(self, text, rows, cols):
+        """Decrypt için spiral sıraya uygun şekilde matris doldurma."""
+        matrix = [["" for _ in range(cols)] for _ in range(rows)]
+        idx = 0
+
         top, bottom = 0, rows - 1
         left, right = 0, cols - 1
-        
-        while top <= bottom and left <= right and text_idx < len(text):
-            # Sağa
-            for i in range(left, right + 1):
-                if text_idx < len(text):
-                    matrix[top][i] = text[text_idx]
-                    text_idx += 1
+
+        while top <= bottom and left <= right:
+
+            for c in range(left, right + 1):
+                matrix[top][c] = text[idx]
+                idx += 1
             top += 1
-            
-            # Aşağı
-            for i in range(top, bottom + 1):
-                if text_idx < len(text):
-                    matrix[i][right] = text[text_idx]
-                    text_idx += 1
+
+            for r in range(top, bottom + 1):
+                matrix[r][right] = text[idx]
+                idx += 1
             right -= 1
-            
-            # Sola
+
             if top <= bottom:
-                for i in range(right, left - 1, -1):
-                    if text_idx < len(text):
-                        matrix[bottom][i] = text[text_idx]
-                        text_idx += 1
+                for c in range(right, left - 1, -1):
+                    matrix[bottom][c] = text[idx]
+                    idx += 1
                 bottom -= 1
-            
-            # Yukarı
+
             if left <= right:
-                for i in range(bottom, top - 1, -1):
-                    if text_idx < len(text):
-                        matrix[i][left] = text[text_idx]
-                        text_idx += 1
+                for r in range(bottom, top - 1, -1):
+                    matrix[r][left] = text[idx]
+                    idx += 1
                 left += 1
-        
+
         return matrix
-    
-    def _row_read(self, matrix: list, rows: int, cols: int) -> str:
-        """Satır satır okur."""
-        result = []
-        for i in range(rows):
-            for j in range(cols):
-                if matrix[i][j] != ' ':
-                    result.append(matrix[i][j])
-        return ''.join(result)
-    
-    def _row_write(self, text: str, rows: int, cols: int) -> list:
-        """Satır satır yazar."""
-        matrix = [[' ' for _ in range(cols)] for _ in range(rows)]
-        text_idx = 0
-        for i in range(rows):
-            for j in range(cols):
-                if text_idx < len(text):
-                    matrix[i][j] = text[text_idx]
-                    text_idx += 1
+
+    def _read_column(self, matrix, rows, cols):
+        return "".join(matrix[r][c] for c in range(cols) for r in range(rows))
+
+    def _write_column(self, text, rows, cols):
+        matrix = [["" for _ in range(cols)] for _ in range(rows)]
+        idx = 0
+        for c in range(cols):
+            for r in range(rows):
+                matrix[r][c] = text[idx]
+                idx += 1
         return matrix
-    
-    def _column_read(self, matrix: list, rows: int, cols: int) -> str:
-        """Sütun sütun okur."""
-        result = []
-        for j in range(cols):
-            for i in range(rows):
-                if matrix[i][j] != ' ':
-                    result.append(matrix[i][j])
-        return ''.join(result)
-    
-    def _column_write(self, text: str, rows: int, cols: int) -> list:
-        """Sütun sütun yazar."""
-        matrix = [[' ' for _ in range(cols)] for _ in range(rows)]
-        text_idx = 0
-        for j in range(cols):
-            for i in range(rows):
-                if text_idx < len(text):
-                    matrix[i][j] = text[text_idx]
-                    text_idx += 1
-        return matrix
-    
-    def _diagonal_read(self, matrix: list, rows: int, cols: int) -> str:
-        """Diagonal (çapraz) okur."""
-        result = []
-        # Sol üstten sağ alta
+
+    def _read_diagonal(self, matrix, rows, cols):
+        res = []
         for d in range(rows + cols - 1):
-            for i in range(rows):
-                j = d - i
-                if 0 <= j < cols:
-                    if matrix[i][j] != ' ':
-                        result.append(matrix[i][j])
-        return ''.join(result)
-    
-    def _diagonal_write(self, text: str, rows: int, cols: int) -> list:
-        """Diagonal (çapraz) yazar."""
-        matrix = [[' ' for _ in range(cols)] for _ in range(rows)]
-        text_idx = 0
-        # Sol üstten sağ alta
+            for r in range(rows):
+                c = d - r
+                if 0 <= c < cols:
+                    res.append(matrix[r][c])
+        return "".join(res)
+
+    def _write_diagonal(self, text, rows, cols):
+        matrix = [["" for _ in range(cols)] for _ in range(rows)]
+        idx = 0
         for d in range(rows + cols - 1):
-            for i in range(rows):
-                j = d - i
-                if 0 <= j < cols and text_idx < len(text):
-                    matrix[i][j] = text[text_idx]
-                    text_idx += 1
+            for r in range(rows):
+                c = d - r
+                if 0 <= c < cols:
+                    matrix[r][c] = text[idx]
+                    idx += 1
         return matrix
-    
+
+    # --------------------------------------------------------------
+    # ENCRYPT
+    # --------------------------------------------------------------
+
     def encrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Veriyi Route Cipher ile şifreler.
-        
-        Args:
-            data: Şifrelenecek veri (bytes)
-            key: Format: 'rows:cols:route_type'
-            
-        Returns:
-            bytes: Şifrelenmiş veri
-        """
         try:
             rows, cols, route_type = self._parse_key(key)
-            
-            # Veriyi string'e çevir ve temizle
-            text = data.decode('utf-8', errors='ignore').upper().replace(' ', '')
-            
-            # Matrise yaz
-            if route_type == 'spiral':
-                matrix = self._spiral_write(text, rows, cols)
-                # Spiral yazıldıktan sonra satır satır oku
-                encrypted_text = self._row_read(matrix, rows, cols)
-            elif route_type == 'row':
-                matrix = self._row_write(text, rows, cols)
-                # Satır satır yazıldıktan sonra sütun sütun oku
-                encrypted_text = self._column_read(matrix, rows, cols)
-            elif route_type == 'column':
-                matrix = self._column_write(text, rows, cols)
-                # Sütun sütun yazıldıktan sonra satır satır oku
-                encrypted_text = self._row_read(matrix, rows, cols)
-            elif route_type == 'diagonal':
-                matrix = self._diagonal_write(text, rows, cols)
-                # Diagonal yazıldıktan sonra satır satır oku
-                encrypted_text = self._row_read(matrix, rows, cols)
+
+            text = (
+                data.decode("utf-8", errors="ignore")
+                .upper()
+                .replace(" ", "")
+            )
+
+            matrix = self._fill_matrix_rowwise(text, rows, cols)
+
+            if route_type == "spiral":
+                encrypted = self._read_spiral(matrix, rows, cols)
+            elif route_type == "row":
+                encrypted = self._read_row(matrix, rows, cols)
+            elif route_type == "column":
+                encrypted = self._read_column(matrix, rows, cols)
             else:
-                raise ValueError(f"Bilinmeyen rota tipi: {route_type}")
-            
-            return encrypted_text.encode('utf-8')
-        
+                encrypted = self._read_diagonal(matrix, rows, cols)
+
+            return encrypted.encode("utf-8")
+
         except Exception as e:
             raise Exception(f"Route şifreleme hatası: {str(e)}")
-    
+
+    # --------------------------------------------------------------
+    # DECRYPT
+    # --------------------------------------------------------------
+
     def decrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Route Cipher ile şifrelenmiş veriyi çözer.
-        
-        Args:
-            data: Çözülecek veri (bytes)
-            key: Format: 'rows:cols:route_type'
-            
-        Returns:
-            bytes: Çözülmüş veri
-        """
         try:
             rows, cols, route_type = self._parse_key(key)
-            
-            # Veriyi string'e çevir
-            text = data.decode('utf-8', errors='ignore').upper().replace(' ', '')
-            
-            # Matrise yaz (şifrelemenin tersi)
-            if route_type == 'spiral':
-                # Satır satır yaz
-                matrix = self._row_write(text, rows, cols)
-                # Spiral oku
-                decrypted_text = self._spiral_read(matrix, rows, cols)
-            elif route_type == 'row':
-                # Sütun sütun yaz
-                matrix = self._column_write(text, rows, cols)
-                # Satır satır oku
-                decrypted_text = self._row_read(matrix, rows, cols)
-            elif route_type == 'column':
-                # Satır satır yaz
-                matrix = self._row_write(text, rows, cols)
-                # Sütun sütun oku
-                decrypted_text = self._column_read(matrix, rows, cols)
-            elif route_type == 'diagonal':
-                # Satır satır yaz
-                matrix = self._row_write(text, rows, cols)
-                # Diagonal oku
-                decrypted_text = self._diagonal_read(matrix, rows, cols)
+
+            text = data.decode("utf-8", errors="ignore").upper()
+
+            if route_type == "spiral":
+                matrix = self._write_spiral(text, rows, cols)
+            elif route_type == "row":
+                matrix = self._fill_matrix_rowwise(text, rows, cols)
+            elif route_type == "column":
+                matrix = self._write_column(text, rows, cols)
             else:
-                raise ValueError(f"Bilinmeyen rota tipi: {route_type}")
-            
-            return decrypted_text.encode('utf-8')
-        
+                matrix = self._write_diagonal(text, rows, cols)
+
+            decrypted = self._read_matrix_rowwise(matrix, rows, cols)
+            return decrypted.encode("utf-8")
+
         except Exception as e:
             raise Exception(f"Route çözme hatası: {str(e)}")
-

@@ -1,96 +1,97 @@
 """
 BaseCipher - Tüm Şifreleme Algoritmalarının Temel Sınıfı
 
-Bu sınıf, tüm şifreleme algoritmalarının ortak özelliklerini ve
-temel yapısını tanımlar. Her algoritma bu sınıftan türetilmelidir.
+Bu sınıf, tüm şifreleme algoritmalarının ortak arayüzünü tanımlar.
+Yeni bir algoritma eklemek için bu sınıftan türetilmeli ve 
+encrypt() ile decrypt() metodları mutlaka implement edilmelidir.
 """
 
 from abc import ABC, abstractmethod
-from typing import Union
 
 
 class BaseCipher(ABC):
     """
-    Tüm şifreleme algoritmalarının temel sınıfı.
-    
-    Bu sınıf, her algoritmanın sahip olması gereken temel özellikleri
-    ve metodları tanımlar. Yeni bir algoritma eklemek için bu sınıftan
-    türetilmeli ve encrypt() ile decrypt() metodları implement edilmelidir.
+    Tüm şifreleme algoritmaları için temel soyut sınıf.
+
+    Ortak özellikler:
+    - Algoritma adı
+    - Açıklama
+    - Anahtar türü (“string”, “integer”, “matrix”, vb.)
+    - Binary veri desteği
+    - Minimum / maksimum anahtar uzunluğu
     """
 
     def __init__(self):
-        """Temel özellikleri başlatır."""
-        self.name = "BaseCipher"
-        self.description = "Temel şifreleme sınıfı"
-        self.key_type = "string"  # "string", "integer", "matrix" vb.
-        self.supports_binary = True  # Binary veri (resim, ses, video) destekleniyor mu?
-        self.min_key_length = 1  # Minimum anahtar uzunluğu
-        self.max_key_length = 256  # Maksimum anahtar uzunluğu
+        """Temel algoritma özelliklerini başlatır."""
+        self.name: str = "BaseCipher"
+        self.description: str = "Temel şifreleme sınıfı"
+        self.key_type: str = "string"
+        self.supports_binary: bool = True
+        self.min_key_length: int = 1
+        self.max_key_length: int = 256
+
+    # ---------------------------------------------------------------------
 
     @abstractmethod
     def encrypt(self, data: bytes, key: str) -> bytes:
         """
-        Veriyi şifreler (soyut metod - her algoritma kendi implementasyonunu yapmalı).
-        
+        Veriyi şifreler.
+
         Args:
-            data: Şifrelenecek veri (bytes)
-            key: Şifreleme anahtarı (string)
-            
+            data (bytes): Şifrelenecek ham veri.
+            key (str): Şifreleme anahtarı.
+
         Returns:
-            bytes: Şifrelenmiş veri
+            bytes: Şifrelenmiş veri.
         """
-        pass
+        raise NotImplementedError("encrypt() metodu implement edilmelidir.")
 
     @abstractmethod
     def decrypt(self, data: bytes, key: str) -> bytes:
         """
-        Şifrelenmiş veriyi çözer (soyut metod - her algoritma kendi implementasyonunu yapmalı).
-        
+        Şifrelenmiş veriyi çözer.
+
         Args:
-            data: Çözülecek veri (bytes)
-            key: Şifreleme anahtarı (string)
-            
+            data (bytes): Şifreli veri.
+            key (str): Şifre çözme anahtarı.
+
         Returns:
-            bytes: Çözülmüş veri
+            bytes: Çözülmüş veri.
         """
-        pass
+        raise NotImplementedError("decrypt() metodu implement edilmelidir.")
+
+    # ---------------------------------------------------------------------
 
     def validate_key(self, key: str) -> bool:
         """
-        Anahtarın geçerli olup olmadığını kontrol eder.
-        
-        Varsayılan kontrol: Anahtar boş olmamalı ve uzunluk sınırları içinde olmalı.
-        Algoritmalar bu metodu override ederek kendi kontrollerini yapabilir.
-        
-        Args:
-            key: Kontrol edilecek anahtar
-            
-        Returns:
-            bool: Anahtar geçerliyse True
+        Anahtarın geçerliliğini kontrol eder.
+
+        Varsayılan kurallar:
+        - Anahtar boş olmamalı
+        - Uzunluğu min ve max arasında olmalı
+
+        Override edilerek algoritmaya özel kontrol eklenebilir.
         """
-        if not key:
-            return False
+        return (
+            isinstance(key, str)
+            and len(key) >= self.min_key_length
+            and len(key) <= self.max_key_length
+        )
 
-        if len(key) < self.min_key_length:
-            return False
-
-        if len(key) > self.max_key_length:
-            return False
-
-        return True
+    # ---------------------------------------------------------------------
 
     def _prepare_data(self, data: bytes) -> bytes:
         """
-        Veriyi işleme hazırlar (opsiyonel - override edilebilir).
-        
-        Bazı algoritmalar veriyi işlemeden önce özel hazırlık yapabilir.
+        Veriyi şifreleme için hazırlar.
+
+        Algoritmalar isterse override edebilir.
         """
         return data
 
     def _finalize_data(self, data: bytes) -> bytes:
         """
-        İşlenmiş veriyi son haline getirir (opsiyonel - override edilebilir).
-        
-        Bazı algoritmalar veriyi işledikten sonra özel işlemler yapabilir.
+        Şifreleme/şifre çözme sonrası veriyi finalize eder.
+
+        Algoritmalar override edebilir.
         """
         return data

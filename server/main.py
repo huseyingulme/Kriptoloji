@@ -12,13 +12,14 @@ from shared.utils import Logger
 
 class ServerApplication:
 
-    def __init__(self, host="localhost", port=12345):
+    def __init__(self, host="localhost", port=12345, use_gui=True):
         self.host = host
         self.port = port
         self.server = None
         self.processing_manager = None
         self.key_manager = None
         self.running = False
+        self.use_gui = use_gui
 
     def start(self):
         try:
@@ -31,12 +32,15 @@ class ServerApplication:
             self.server.set_processing_callback(self.processing_manager.process_request)
             self.server.set_key_manager(self.key_manager)
 
-            signal.signal(signal.SIGINT, self._signal_handler)
-            signal.signal(signal.SIGTERM, self._signal_handler)
+            if not self.use_gui:
+                signal.signal(signal.SIGINT, self._signal_handler)
+                signal.signal(signal.SIGTERM, self._signal_handler)
 
             self.running = True
             Logger.info(f"Server başlatıldı: {self.host}:{self.port}", "ServerApp")
-            Logger.info("Çıkmak için Ctrl+C tuşlarına basın", "ServerApp")
+            
+            if not self.use_gui:
+                Logger.info("Çıkmak için Ctrl+C tuşlarına basın", "ServerApp")
 
             self.server.start()
 
@@ -70,11 +74,24 @@ def main():
         parser = argparse.ArgumentParser(description="Kriptoloji Server")
         parser.add_argument("--host", default="localhost", help="Server host adresi")
         parser.add_argument("--port", type=int, default=12345, help="Server port numarası")
+        parser.add_argument("--no-gui", action="store_true", help="GUI olmadan çalıştır (sadece konsol)")
 
         args = parser.parse_args()
 
-        app = ServerApplication(args.host, args.port)
-        app.start()
+        # GUI kullan
+        if not args.no_gui:
+            try:
+                from server.gui.ServerWindow import ServerWindow
+                app = ServerWindow(args.host, args.port)
+                app.run()
+            except ImportError as e:
+                Logger.warning(f"GUI yüklenemedi: {str(e)}, konsol moduna geçiliyor", "ServerApp")
+                app = ServerApplication(args.host, args.port, use_gui=False)
+                app.start()
+        else:
+            # Konsol modu
+            app = ServerApplication(args.host, args.port, use_gui=False)
+            app.start()
 
     except Exception as e:
         Logger.error(f"Server başlatma hatası: {str(e)}", "ServerApp")

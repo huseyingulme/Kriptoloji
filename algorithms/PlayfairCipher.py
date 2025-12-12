@@ -1,153 +1,178 @@
 import re
 from algorithms.BaseCipher import BaseCipher
 
+
 class PlayfairCipher(BaseCipher):
 
     def __init__(self):
         super().__init__()
         self.name = "Playfair Cipher"
-        self.description = "5x5 matris tabanlı çift karakter şifreleme"
+        self.description = "5x5 matris tabanlı çift harf şifreleme algoritması"
         self.key_type = "string"
         self.min_key_length = 1
         self.max_key_length = 25
-        self.key_description = "Anahtar kelime (J hariç 25 harf)"
+        self.key_description = "Anahtar kelime (J harfi kullanılmaz, I ile birleştirilir)"
         self.alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
 
-    def encrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            text = data.decode('utf-8', errors='ignore').upper()
-            text = re.sub(r'[^A-Z]', '', text)
+    # ----------------------------------------------------------
+    # ---------------    TEXT PREPARE   ------------------------
+    # ----------------------------------------------------------
+    def _clean_text(self, text: str) -> str:
+        text = text.upper().replace("J", "I")
+        text = re.sub(r'[^A-Z]', '', text)
+        return text
 
-            if len(text) == 0:
-                raise ValueError("Geçerli metin bulunamadı")
-
-            matrix = self._create_matrix(key)
-            pairs = self._prepare_pairs(text)
-
-            result = ""
-            for pair in pairs:
-                encrypted_pair = self._encrypt_pair(pair, matrix)
-                result += encrypted_pair
-
-            return result.encode('utf-8')
-
-        except Exception as e:
-            raise Exception(f"Şifreleme hatası: {str(e)}")
-
-    def decrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            text = data.decode('utf-8', errors='ignore').upper()
-            text = re.sub(r'[^A-Z]', '', text)
-
-            if len(text) == 0:
-                raise ValueError("Geçerli metin bulunamadı")
-
-            matrix = self._create_matrix(key)
-            pairs = self._prepare_pairs(text)
-
-            result = ""
-            for pair in pairs:
-                decrypted_pair = self._decrypt_pair(pair, matrix)
-                result += decrypted_pair
-
-            return result.encode('utf-8')
-
-        except Exception as e:
-            raise Exception(f"Çözme hatası: {str(e)}")
-
+    # ----------------------------------------------------------
+    # ---------------    MATRIX CREATE   ------------------------
+    # ----------------------------------------------------------
     def _create_matrix(self, key: str) -> list:
-        key = key.upper().replace('J', 'I')
-        key = re.sub(r'[^A-Z]', '', key)
-
+        key = self._clean_text(key)
         if not key:
-            raise ValueError("Geçerli anahtar bulunamadı")
+            raise ValueError("Anahtar boş olamaz")
 
+        used = set()
         matrix = []
-        used_chars = set()
 
-        for char in key:
-            if char not in used_chars and char in self.alphabet:
-                matrix.append(char)
-                used_chars.add(char)
+        # Anahtarı ekle
+        for c in key:
+            if c not in used and c in self.alphabet:
+                used.add(c)
+                matrix.append(c)
 
-        for char in self.alphabet:
-            if char not in used_chars:
-                matrix.append(char)
+        # Geri kalan harfleri ekle
+        for c in self.alphabet:
+            if c not in used:
+                used.add(c)
+                matrix.append(c)
 
+        # 5x5 matrise çevir
         return [matrix[i:i+5] for i in range(0, 25, 5)]
 
+    # ----------------------------------------------------------
+    # ---------------  PAIR GENERATION (ENCRYPT)  ---------------
+    # ----------------------------------------------------------
     def _prepare_pairs(self, text: str) -> list:
         pairs = []
         i = 0
 
         while i < len(text):
+            a = text[i]
+            b = ''
+
             if i + 1 < len(text):
-                if text[i] == text[i + 1]:
-                    pairs.append(text[i] + 'X')
+                b = text[i + 1]
+
+                if a == b:      # Aynı harf olması yasak → X ekle
+                    pairs.append(a + 'X')
                     i += 1
                 else:
-                    pairs.append(text[i] + text[i + 1])
+                    pairs.append(a + b)
                     i += 2
             else:
-                pairs.append(text[i] + 'X')
+                pairs.append(a + 'X')  # Tek harf kalırsa → X ekle
                 i += 1
 
         return pairs
 
-    def _find_position(self, char: str, matrix: list) -> tuple:
+    # ----------------------------------------------------------
+    # ------- FIND POSITION in MATRIX --------------------------
+    # ----------------------------------------------------------
+    def _find(self, ch: str, matrix: list):
         for i in range(5):
             for j in range(5):
-                if matrix[i][j] == char:
-                    return (i, j)
+                if matrix[i][j] == ch:
+                    return i, j
         return None
 
-    def _encrypt_pair(self, pair: str, matrix: list) -> str:
-        char1, char2 = pair[0], pair[1]
-        pos1 = self._find_position(char1, matrix)
-        pos2 = self._find_position(char2, matrix)
+    # ----------------------------------------------------------
+    # -------------------- ENCRYPT PAIR -------------------------
+    # ----------------------------------------------------------
+    def _encrypt_pair(self, a: str, b: str, m: list) -> str:
+        r1, c1 = self._find(a, m)
+        r2, c2 = self._find(b, m)
 
-        if not pos1 or not pos2:
-            return pair
+        if r1 == r2:  # same row → shift right
+            return m[r1][(c1 + 1) % 5] + m[r2][(c2 + 1) % 5]
 
-        row1, col1 = pos1
-        row2, col2 = pos2
+        if c1 == c2:  # same column → shift down
+            return m[(r1 + 1) % 5][c1] + m[(r2 + 1) % 5][c2]
 
-        if row1 == row2:
-            return matrix[row1][(col1 + 1) % 5] + matrix[row2][(col2 + 1) % 5]
-        elif col1 == col2:
-            return matrix[(row1 + 1) % 5][col1] + matrix[(row2 + 1) % 5][col2]
-        else:
-            return matrix[row1][col2] + matrix[row2][col1]
+        # rectangle rule
+        return m[r1][c2] + m[r2][c1]
 
-    def _decrypt_pair(self, pair: str, matrix: list) -> str:
-        char1, char2 = pair[0], pair[1]
-        pos1 = self._find_position(char1, matrix)
-        pos2 = self._find_position(char2, matrix)
+    # ----------------------------------------------------------
+    # -------------------- DECRYPT PAIR -------------------------
+    # ----------------------------------------------------------
+    def _decrypt_pair(self, a: str, b: str, m: list) -> str:
+        r1, c1 = self._find(a, m)
+        r2, c2 = self._find(b, m)
 
-        if not pos1 or not pos2:
-            return pair
+        if r1 == r2:  # same row → shift left
+            return m[r1][(c1 - 1) % 5] + m[r2][(c2 - 1) % 5]
 
-        row1, col1 = pos1
-        row2, col2 = pos2
+        if c1 == c2:  # same column → shift up
+            return m[(r1 - 1) % 5][c1] + m[(r2 - 1) % 5][c2]
 
-        if row1 == row2:
-            result = matrix[row1][(col1 - 1) % 5] + matrix[row2][(col2 - 1) % 5]
-        elif col1 == col2:
-            result = matrix[(row1 - 1) % 5][col1] + matrix[(row2 - 1) % 5][col2]
-        else:
-            result = matrix[row1][col2] + matrix[row2][col1]
+        # rectangle rule
+        return m[r1][c2] + m[r2][c1]
 
-        if result.endswith('X'):
-            result = result[:-1]
+    # ----------------------------------------------------------
+    # ---------------------- ENCRYPT ----------------------------
+    # ----------------------------------------------------------
+    def encrypt(self, data: bytes, key: str) -> bytes:
+        try:
+            text = self._clean_text(data.decode("utf-8", errors="ignore"))
 
-        return result
+            if not text:
+                raise ValueError("Şifrelenecek geçerli metin yok")
 
+            matrix = self._create_matrix(key)
+            pairs = self._prepare_pairs(text)
+
+            cipher = ""
+            for p in pairs:
+                cipher += self._encrypt_pair(p[0], p[1], matrix)
+
+            return cipher.encode("utf-8")
+
+        except Exception as e:
+            raise Exception(f"Playfair şifreleme hatası: {str(e)}")
+
+    # ----------------------------------------------------------
+    # ---------------------- DECRYPT ----------------------------
+    # ----------------------------------------------------------
+    def decrypt(self, data: bytes, key: str) -> bytes:
+        try:
+            text = self._clean_text(data.decode("utf-8", errors="ignore"))
+
+            if len(text) % 2 != 0:
+                raise ValueError("Şifreli metin çift sayıda karakter içermeli")
+
+            matrix = self._create_matrix(key)
+
+            pairs = [text[i:i+2] for i in range(0, len(text), 2)]
+
+            plain = ""
+            for p in pairs:
+                plain += self._decrypt_pair(p[0], p[1], matrix)
+
+            # Gereksiz X pad’leri silme (bazı X’ler gerçek olabilir!)
+            if plain.endswith("X"):
+                plain = plain[:-1]
+
+            return plain.encode("utf-8")
+
+        except Exception as e:
+            raise Exception(f"Playfair çözme hatası: {str(e)}")
+
+    # ----------------------------------------------------------
+    # ------------------ KEY VALIDATION -------------------------
+    # ----------------------------------------------------------
     def validate_key(self, key: str) -> bool:
         if not key:
             return False
 
-        key = key.upper().replace('J', 'I')
-        key = re.sub(r'[^A-Z]', '', key)
+        key = self._clean_text(key)
 
         if len(key) < self.min_key_length or len(key) > self.max_key_length:
             return False

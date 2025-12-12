@@ -15,6 +15,9 @@ from typing import Optional, Dict, Any, Callable
 from shared.utils import DataPacket, Logger
 from config import config_manager
 
+# Wireshark modunu kontrol et
+WIRESHARK_MODE = config_manager.get("features.wireshark_mode", False)
+
 
 class Server:
     """
@@ -45,6 +48,7 @@ class Server:
         self.hybrid_decryption_manager = None  # Hibrit çözme yöneticisi
         self.max_clients = config_manager.get("server.max_clients", 10)
         self.timeout = config_manager.get("server.timeout", 30)
+        self.operation_callback: Optional[Callable] = None  # İşlem logları için callback
 
     def start(self):
         """
@@ -82,6 +86,17 @@ class Server:
                     client_socket, client_address = self.socket.accept()
                     client_socket.settimeout(self.timeout)
                     Logger.info(f"Yeni client bağlandı: {client_address}", "Server")
+                    
+                    # Client bağlantısını logla
+                    if self.operation_callback:
+                        try:
+                            self.operation_callback({
+                                'type': 'client_connected',
+                                'client': str(client_address),
+                                'timestamp': time.time()
+                            })
+                        except:
+                            pass
 
                     # Her client için ayrı thread oluştur
                     client_thread = threading.Thread(
@@ -129,8 +144,11 @@ class Server:
                     break
 
                 try:
-                    # Paketi parse et
-                    packet_data, packet_type, metadata = DataPacket.parse_packet(data)
+                    # Paketi parse et (Wireshark modu kontrolü)
+                    packet_data, packet_type, metadata = DataPacket.parse_packet(data, use_json_format=WIRESHARK_MODE)
+                    
+                    if WIRESHARK_MODE:
+                        Logger.info(f"[WIRESHARK MODE] JSON paket alındı: {data.decode('utf-8', errors='ignore')[:200]}...", "Server")
 
                     # PING isteği - Server'ın çalıştığını kontrol etmek için
                     if packet_type == 'PING':
@@ -182,8 +200,10 @@ class Server:
         """PING isteğine PONG cevabı gönderir."""
         try:
             pong_metadata = {'type': 'PONG', 'timestamp': time.time()}
-            pong_packet = DataPacket.create_packet(b"PONG", 'PONG', pong_metadata)
+            pong_packet = DataPacket.create_packet(b"PONG", 'PONG', pong_metadata, use_json_format=WIRESHARK_MODE)
             client_socket.send(pong_packet)
+            if WIRESHARK_MODE:
+                Logger.info(f"[WIRESHARK MODE] JSON PONG gönderildi: {pong_packet.decode('utf-8', errors='ignore')[:200]}...", "Server")
         except Exception as e:
             Logger.error(f"Pong gönderme hatası: {str(e)}", "Server")
 
@@ -200,9 +220,11 @@ class Server:
                 'timestamp': time.time(),
                 'key_size': 2048
             }
-            key_packet = DataPacket.create_packet(public_key, 'PUBLIC_KEY', key_metadata)
+            key_packet = DataPacket.create_packet(public_key, 'PUBLIC_KEY', key_metadata, use_json_format=WIRESHARK_MODE)
             client_socket.sendall(key_packet)
             Logger.info("RSA public key gönderildi", "Server")
+            if WIRESHARK_MODE:
+                Logger.info(f"[WIRESHARK MODE] JSON PUBLIC_KEY gönderildi: {key_packet.decode('utf-8', errors='ignore')[:200]}...", "Server")
         except Exception as e:
             Logger.error(f"Public key gönderme hatası: {str(e)}", "Server")
             self._send_error(client_socket, f"Public key gönderme hatası: {str(e)}")
@@ -263,26 +285,78 @@ class Server:
                 self._send_error(client_socket, "Anahtar boş olamaz")
                 return
 
+            # İşlem başlangıcını logla
+            if self.operation_callback:
+                try:
+                    self.operation_callback({
+                        'type': 'operation_start',
+                        'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
+                        'operation': operation,
+                        'algorithm': algorithm,
+                        'data_size': len(data),
+                        'timestamp': time.time()
+                    })
+                except:
+                    pass
+
             # ProcessingManager'a yönlendir (ŞİFRELEME İŞLEMİ BURADA YAPILIR!)
             if self.processing_callback:
                 result = self.processing_callback(data, operation, algorithm, key, metadata)
 
                 # Başarılı sonuç
                 if result and result.get('success'):
-                    result_metadata = {
-                        'type': 'RESULT',
-                        'algorithm': algorithm,
-                        'operation': operation,
-                        'timestamp': time.time()
-                    }
-                    result_packet = DataPacket.create_packet(result['data'], 'RESULT', result_metadata)
-                    client_socket.sendall(result_packet)
+                    if WIRESHARK_MODE:
+                        # Wireshark modu: JSON formatında cevap gönder
+                        result_packet = DataPacket.create_json_response(
+                            result['data'], 'RESULT', algorithm, success=True
+                        )
+                        client_socket.sendall(result_packet)
+                        Logger.info(f"[WIRESHARK MODE] JSON cevap gönderildi: {result_packet.decode('utf-8', errors='ignore')[:200]}...", "Server")
+                    else:
+                        # Normal mod: Binary paket formatı
+                        result_metadata = {
+                            'type': 'RESULT',
+                            'algorithm': algorithm,
+                            'operation': operation,
+                            'timestamp': time.time()
+                        }
+                        result_packet = DataPacket.create_packet(result['data'], 'RESULT', result_metadata)
+                        client_socket.sendall(result_packet)
                     Logger.info(f"İşlem tamamlandı: {operation} - {algorithm}", "Server")
+                    
+                    # İşlem başarısını logla
+                    if self.operation_callback:
+                        try:
+                            self.operation_callback({
+                                'type': 'operation_success',
+                                'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
+                                'operation': operation,
+                                'algorithm': algorithm,
+                                'data_size': len(data),
+                                'result_size': len(result.get('data', b'')),
+                                'timestamp': time.time()
+                            })
+                        except:
+                            pass
                 else:
                     # Hata durumu
                     error_msg = result.get('error', 'İşlem başarısız') if result else 'İşlem başarısız'
                     Logger.warning(f"İşlem başarısız: {error_msg}", "Server")
                     self._send_error(client_socket, error_msg)
+                    
+                    # İşlem hatasını logla
+                    if self.operation_callback:
+                        try:
+                            self.operation_callback({
+                                'type': 'operation_error',
+                                'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
+                                'operation': operation,
+                                'algorithm': algorithm,
+                                'error': error_msg,
+                                'timestamp': time.time()
+                            })
+                        except:
+                            pass
             else:
                 Logger.error("ProcessingManager bulunamadı", "Server")
                 self._send_error(client_socket, "ProcessingManager bulunamadı")
@@ -296,13 +370,22 @@ class Server:
     def _send_error(self, client_socket: socket.socket, error_message: str):
         """Client'a hata mesajı gönderir."""
         try:
-            error_metadata = {
-                'type': 'ERROR',
-                'error': error_message,
-                'timestamp': time.time()
-            }
-            error_packet = DataPacket.create_packet(b"", 'ERROR', error_metadata)
-            client_socket.sendall(error_packet)
+            if WIRESHARK_MODE:
+                # Wireshark modu: JSON formatında hata gönder
+                error_packet = DataPacket.create_json_response(
+                    b"", 'ERROR', '', success=False, error=error_message
+                )
+                client_socket.sendall(error_packet)
+                Logger.info(f"[WIRESHARK MODE] JSON hata gönderildi: {error_packet.decode('utf-8', errors='ignore')[:200]}...", "Server")
+            else:
+                # Normal mod: Binary paket formatı
+                error_metadata = {
+                    'type': 'ERROR',
+                    'error': error_message,
+                    'timestamp': time.time()
+                }
+                error_packet = DataPacket.create_packet(b"", 'ERROR', error_metadata)
+                client_socket.sendall(error_packet)
         except Exception as e:
             Logger.error(f"Hata gönderme hatası: {str(e)}", "Server")
 
@@ -320,6 +403,10 @@ class Server:
         if key_manager:
             from server.hybrid_decryption import HybridDecryptionManager
             self.hybrid_decryption_manager = HybridDecryptionManager(key_manager)
+    
+    def set_operation_callback(self, callback: Callable):
+        """İşlem logları için callback fonksiyonunu ayarlar."""
+        self.operation_callback = callback
 
     def get_client_count(self) -> int:
         """Bağlı client sayısını döndürür."""

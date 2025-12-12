@@ -1,16 +1,19 @@
 import re
 from algorithms.BaseCipher import BaseCipher
 
+
 class PolybiusCipher(BaseCipher):
 
     def __init__(self):
         super().__init__()
         self.name = "Polybius Cipher"
-        self.description = "5x5 tablo tabanlı satır/sütun şifrelemesi"
+        self.description = "5x5 Polybius karesi ile satır-sütun konum şifreleme"
         self.key_type = "string"
         self.min_key_length = 1
         self.max_key_length = 25
-        self.key_description = "Tablo düzeni anahtarı (opsiyonel)"
+        self.key_description = "İsteğe bağlı tablo anahtarı (J harfi I ile birleştirilir)"
+
+        # Standart Polybius karesi
         self.default_table = [
             ['A', 'B', 'C', 'D', 'E'],
             ['F', 'G', 'H', 'I', 'K'],
@@ -19,110 +22,118 @@ class PolybiusCipher(BaseCipher):
             ['V', 'W', 'X', 'Y', 'Z']
         ]
 
-    def encrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            text = data.decode('utf-8', errors='ignore').upper()
-            text = re.sub(r'[^A-Z]', '', text)
-            text = text.replace('J', 'I')
+        self.alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"  # J hariç
 
-            if len(text) == 0:
-                raise ValueError("Geçerli metin bulunamadı")
+    # ----------------------------------------------------------
+    # ---------------- TEXT CLEAN ------------------------------
+    # ----------------------------------------------------------
+    def _clean_text(self, text: str) -> str:
+        text = text.upper().replace("J", "I")
+        text = re.sub(r"[^A-Z]", "", text)
+        return text
 
-            table = self._create_table(key) if key else self.default_table
-
-            result = ""
-            for char in text:
-                if char == 'J':
-                    char = 'I'
-
-                position = self._find_position(char, table)
-                if position:
-                    row, col = position
-                    result += f"{row + 1}{col + 1}"
-                else:
-                    result += "00"
-
-            return result.encode('utf-8')
-
-        except Exception as e:
-            raise Exception(f"Şifreleme hatası: {str(e)}")
-
-    def decrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            text = data.decode('utf-8', errors='ignore')
-            text = re.sub(r'[^0-9]', '', text)
-
-            if len(text) == 0:
-                raise ValueError("Geçerli şifreli metin bulunamadı")
-
-            if len(text) % 2 != 0:
-                raise ValueError("Şifreli metin çift uzunlukta olmalı")
-
-            table = self._create_table(key) if key else self.default_table
-
-            result = ""
-            for i in range(0, len(text), 2):
-                if i + 1 < len(text):
-                    row = int(text[i]) - 1
-                    col = int(text[i + 1]) - 1
-
-                    if 0 <= row < 5 and 0 <= col < 5:
-                        result += table[row][col]
-                    else:
-                        result += "?"
-
-            return result.encode('utf-8')
-
-        except Exception as e:
-            raise Exception(f"Çözme hatası: {str(e)}")
-
+    # ----------------------------------------------------------
+    # ---------------- CREATE TABLE ----------------------------
+    # ----------------------------------------------------------
     def _create_table(self, key: str) -> list:
-        key = key.upper().replace('J', 'I')
-        key = re.sub(r'[^A-Z]', '', key)
-
         if not key:
             return self.default_table
 
-        used_chars = set()
-        table = []
-        current_row = []
+        key = self._clean_text(key)
 
-        for char in key:
-            if char not in used_chars and char in 'ABCDEFGHIKLMNOPQRSTUVWXYZ':
-                current_row.append(char)
-                used_chars.add(char)
+        used = set()
+        letters = []
 
-                if len(current_row) == 5:
-                    table.append(current_row)
-                    current_row = []
+        # Anahtar harflerini ekle
+        for c in key:
+            if c not in used and c in self.alphabet:
+                used.add(c)
+                letters.append(c)
 
-        for char in 'ABCDEFGHIKLMNOPQRSTUVWXYZ':
-            if char not in used_chars:
-                current_row.append(char)
-                if len(current_row) == 5:
-                    table.append(current_row)
-                    current_row = []
+        # Kalan harfleri ekle
+        for c in self.alphabet:
+            if c not in used:
+                used.add(c)
+                letters.append(c)
 
-        if current_row:
-            while len(current_row) < 5:
-                current_row.append('X')
-            table.append(current_row)
+        # 5x5 tabloyu oluştur
+        return [letters[i:i+5] for i in range(0, 25, 5)]
 
-        return table
-
+    # ----------------------------------------------------------
+    # ---------------- FIND POSITION ---------------------------
+    # ----------------------------------------------------------
     def _find_position(self, char: str, table: list) -> tuple:
-        for i in range(5):
-            for j in range(5):
-                if table[i][j] == char:
-                    return (i, j)
+        for r in range(5):
+            for c in range(5):
+                if table[r][c] == char:
+                    return r, c
         return None
 
+    # ----------------------------------------------------------
+    # -------------------- ENCRYPT -----------------------------
+    # ----------------------------------------------------------
+    def encrypt(self, data: bytes, key: str) -> bytes:
+        try:
+            text = self._clean_text(data.decode("utf-8", errors="ignore"))
+
+            if not text:
+                raise ValueError("Şifrelenecek geçerli metin yok")
+
+            table = self._create_table(key)
+
+            cipher = ""
+            for ch in text:
+                pos = self._find_position(ch, table)
+                if not pos:
+                    raise ValueError(f"Tabloda bulunamayan karakter: {ch}")
+
+                r, c = pos
+                cipher += f"{r+1}{c+1}"  # 1–5 indeksleme
+
+            return cipher.encode("utf-8")
+
+        except Exception as e:
+            raise Exception(f"Polybius şifreleme hatası: {str(e)}")
+
+    # ----------------------------------------------------------
+    # -------------------- DECRYPT -----------------------------
+    # ----------------------------------------------------------
+    def decrypt(self, data: bytes, key: str) -> bytes:
+        try:
+            text = data.decode("utf-8", errors="ignore")
+            text = re.sub(r"[^0-9]", "", text)
+
+            if len(text) == 0:
+                raise ValueError("Çözülecek geçerli sayı verisi yok")
+
+            if len(text) % 2 != 0:
+                raise ValueError("Polybius şifresi çift haneli olmalıdır (ör: 11 23 45)")
+
+            table = self._create_table(key)
+
+            plain = ""
+            for i in range(0, len(text), 2):
+                r = int(text[i]) - 1
+                c = int(text[i+1]) - 1
+
+                if 0 <= r < 5 and 0 <= c < 5:
+                    plain += table[r][c]
+                else:
+                    plain += "?"  # geçersiz koordinat
+
+            return plain.encode("utf-8")
+
+        except Exception as e:
+            raise Exception(f"Polybius çözme hatası: {str(e)}")
+
+    # ----------------------------------------------------------
+    # ------------------ VALIDATE KEY --------------------------
+    # ----------------------------------------------------------
     def validate_key(self, key: str) -> bool:
         if not key:
             return True
 
-        key = key.upper().replace('J', 'I')
-        key = re.sub(r'[^A-Z]', '', key)
+        key = self._clean_text(key)
 
         if len(key) < self.min_key_length or len(key) > self.max_key_length:
             return False
