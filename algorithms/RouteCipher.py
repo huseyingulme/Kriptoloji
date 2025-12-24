@@ -12,6 +12,7 @@ class RouteCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Route Cipher"
+        self.supports_binary = False
         self.description = "Matris içinde seçilen rota ile okuma tabanlı şifreleme"
         self.key_type = "string"
         self.min_key_length = 3

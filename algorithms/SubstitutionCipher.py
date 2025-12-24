@@ -10,6 +10,7 @@ class SubstitutionCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Substitution Cipher"
+        self.supports_binary = False
         self.description = "Alfabe karıştırma tabanlı şifreleme - Her harf başka bir harfle değiştirilir"
         self.key_type = "string"
         self.min_key_length = 26

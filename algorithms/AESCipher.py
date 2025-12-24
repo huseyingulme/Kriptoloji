@@ -57,11 +57,13 @@ class AESCipher(BaseCipher):
             key_str = parts[0]
         elif len(parts) == 3:
             try:
-                key_size = int(parts[0])
+                # Prefixleri temizle (örn: "AES-128" -> "128")
+                size_str = parts[0].upper().replace("AES-", "").replace("AES", "")
+                key_size = int(size_str)
                 mode = parts[1].upper()
                 key_str = parts[2]
             except ValueError:
-                raise ValueError("Geçersiz anahtar formatı. Anahtar boyutu tamsayı olmalıdır.")
+                raise ValueError("Geçersiz anahtar formatı. Anahtar boyutu tamsayı olmalıdır (örn: 128, 192, 256).")
         else:
             raise ValueError("Geçersiz anahtar formatı. Doğru format: 'key' veya 'key_size:mode:key'")
         

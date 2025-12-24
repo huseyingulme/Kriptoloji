@@ -5,12 +5,13 @@ class RailFenceCipher(BaseCipher):
 
     def __init__(self):
         super().__init__()
-        self.name = "Rail Fence Cipher"
-        self.description = "Zikzak (zigzag) ray dizilimi ile yapılan aktarım şifrelemesi"
+        self.name = "Rail Fence (Tren) Cipher"
+        self.supports_binary = False
+        self.description = "Zikzak (zigzag) ray dizilimi ile yapılan yer değiştirme şifrelemesi (Tren Sistemi)"
         self.key_type = "integer"
         self.min_key_length = 2
-        self.max_key_length = 10
-        self.key_description = "Ray sayısı (2 ile 10 arasında olmalı)"
+        self.max_key_length = 20
+        self.key_description = "Ray sayısı (Rail count). Örn: 3"
 
     # -----------------------------------------------------
     # ENCRYPT

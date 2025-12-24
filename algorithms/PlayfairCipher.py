@@ -7,6 +7,7 @@ class PlayfairCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Playfair Cipher"
+        self.supports_binary = False
         self.description = "5x5 matris tabanlı çift harf şifreleme algoritması"
         self.key_type = "string"
         self.min_key_length = 1
@@ -124,7 +125,9 @@ class PlayfairCipher(BaseCipher):
             text = self._clean_text(data.decode("utf-8", errors="ignore"))
 
             if not text:
-                raise ValueError("Şifrelenecek geçerli metin yok")
+                # Eğer hiç harf yoksa (örn binary dosya), olduğu gibi döndür (veya hata ver ama çökme)
+                Logger.warning("Playfair: Şifrelenecek alfabetik karakter bulunamadı.", "PlayfairCipher")
+                return data
 
             matrix = self._create_matrix(key)
             pairs = self._prepare_pairs(text)
@@ -136,7 +139,9 @@ class PlayfairCipher(BaseCipher):
             return cipher.encode("utf-8")
 
         except Exception as e:
-            raise Exception(f"Playfair şifreleme hatası: {str(e)}")
+            from shared.utils import Logger
+            Logger.error(f"Playfair hatası: {str(e)}", "PlayfairCipher")
+            raise e
 
     # ----------------------------------------------------------
     # ---------------------- DECRYPT ----------------------------

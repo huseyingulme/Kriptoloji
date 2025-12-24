@@ -9,7 +9,7 @@ Bu modül, hibrit şifreleme ile gelen paketleri çözer:
 
 import json
 import base64
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from algorithms.AESCipher import AESCipher
 from algorithms.DESCipher import DESCipher
 from algorithms.AESManual import AESManual
@@ -72,7 +72,7 @@ class HybridDecryptionManager:
             Logger.error(f"Paket parse hatası: {str(e)}", "HybridDecryptionManager")
             raise
 
-    def decrypt_message(self, packet: bytes) -> bytes:
+    def decrypt_message(self, packet: bytes, return_dict: bool = False) -> Union[bytes, Dict[str, Any]]:
         """
         Hibrit şifreleme paketini çözer.
         
@@ -83,9 +83,10 @@ class HybridDecryptionManager:
         
         Args:
             packet: Hibrit şifreleme paketi (JSON bytes)
+            return_dict: True ise dict döner (message, key), False ise sadece bytes
             
         Returns:
-            bytes: Çözülmüş mesaj
+            Union[bytes, Dict]: Çözülmüş mesaj veya detaylı dict
         """
         try:
             # 1. Paketi parse et
@@ -122,6 +123,12 @@ class HybridDecryptionManager:
 
             Logger.info(f"Mesaj çözüldü: {len(decrypted_message)} byte", "HybridDecryptionManager")
 
+            if return_dict:
+                return {
+                    'message': decrypted_message,
+                    'key': symmetric_key,
+                    'algorithm': algorithm
+                }
             return decrypted_message
 
         except Exception as e:

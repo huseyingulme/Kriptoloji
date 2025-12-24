@@ -248,6 +248,52 @@ class AESManual(BaseCipher):
             raise ValueError("Geçersiz padding içeriği.")
         return data[:-pad_len]
 
+    # --- Çekirdek AES İşlemleri (Core Cipher) ---
+
+    def _cipher(self, block: bytes, round_keys: List[List[int]]) -> bytes:
+        """AES Şifreleme (Bir Blok)."""
+        state = list(block)
+        Nr = len(round_keys) - 1
+
+        # Başlangıç RoundKey
+        self._add_round_key(state, round_keys[0])
+
+        # Ara Turlar (1 to Nr-1)
+        for r in range(1, Nr):
+            self._sub_bytes(state)
+            self._shift_rows(state)
+            self._mix_columns(state)
+            self._add_round_key(state, round_keys[r])
+
+        # Son Tur (Nr)
+        self._sub_bytes(state)
+        self._shift_rows(state)
+        self._add_round_key(state, round_keys[Nr])
+
+        return bytes(state)
+
+    def _inv_cipher(self, block: bytes, round_keys: List[List[int]]) -> bytes:
+        """AES Çözme (Bir Blok)."""
+        state = list(block)
+        Nr = len(round_keys) - 1
+
+        # Başlangıç RoundKey (Ters sıra: round_keys[Nr])
+        self._add_round_key(state, round_keys[Nr])
+
+        # Ara Turlar (Nr-1 to 1) - Ters İşlemler
+        for r in range(Nr - 1, 0, -1):
+            self._inv_shift_rows(state)
+            self._inv_sub_bytes(state)
+            self._add_round_key(state, round_keys[r])
+            self._inv_mix_columns(state)
+
+        # Son Tur (0) - Ters İşlemler
+        self._inv_shift_rows(state)
+        self._inv_sub_bytes(state)
+        self._add_round_key(state, round_keys[0])
+
+        return bytes(state)
+
     def encrypt(self, data: bytes, key: str) -> bytes:
         """AES-CBC şifreleme."""
         try:

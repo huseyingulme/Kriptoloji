@@ -20,7 +20,6 @@ class MainWindow:
 
         self.client: Optional[Client] = None
         self.file_manager = FileManager()
-        self.hybrid_manager = HybridEncryptionManager()
 
         self.server_host_var = tk.StringVar(value="localhost")
         self.server_port_var = tk.StringVar(value="12345")
@@ -48,7 +47,7 @@ class MainWindow:
             # Modern Simetrik Şifreleme (Manuel)
             "aes_manual", "des_manual",
             # Asimetrik Şifreleme
-            "rsa", "rsa_manual"
+            "rsa", "rsa_manual",
         ]
 
     def _create_widgets(self):
@@ -162,7 +161,6 @@ class MainWindow:
 
         ttk.Button(result_button_frame, text="Sonucu Kaydet", command=self._save_text_result).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(result_button_frame, text="Sonucu Kopyala", command=self._copy_text_result).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(result_button_frame, text="Hex'i Kopyala", command=self._copy_hex_result).pack(side=tk.LEFT)
 
     def _create_file_tab(self):
         file_frame = ttk.Frame(self.notebook)
@@ -194,6 +192,7 @@ class MainWindow:
 
         ttk.Button(settings_frame, text="Algoritma Bilgisi", command=self._show_algorithm_info).grid(row=0, column=2, padx=(10, 0))
         ttk.Button(settings_frame, text="Örnek Anahtar", command=self._fill_example_key).grid(row=0, column=3, padx=(5, 0))
+        ttk.Button(settings_frame, text="❓ Deşifreleme Yardımı", command=self._show_decryption_help).grid(row=0, column=4, padx=(5, 0))
 
         ttk.Label(settings_frame, text="Anahtar:").grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(10, 0))
         self.file_key_entry = ttk.Entry(settings_frame, textvariable=self.key_var, width=20)
@@ -299,8 +298,7 @@ class MainWindow:
                     try:
                         public_key = self.client.request_public_key()
                         if public_key:
-                            self.hybrid_manager.set_server_public_key(public_key)
-                            Logger.info("RSA public key alındı ve ayarlandı", "MainWindow")
+                            Logger.info("RSA public key alındı", "MainWindow")
                     except Exception as e:
                         Logger.warning(f"RSA public key alınamadı: {str(e)}", "MainWindow")
                         # Public key alınamasa bile bağlantı devam edebilir
@@ -393,7 +391,7 @@ class MainWindow:
                 algorithm = self.algorithm_var.get()
                 key = self.key_var.get()
 
-                if not key:
+                if not key and not algorithm.startswith("hybrid_") and algorithm != "pigpen":
                     self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Lütfen anahtar girin."))
                     return
 
@@ -411,107 +409,71 @@ class MainWindow:
                                          'route', 'route_cipher', 'pigpen', 'pigpen_cipher']
                     is_classic_algorithm = algorithm.lower() in classic_algorithms
                     
-                    # Önce "Hex Formatı:" veya "Base64" etiketini kontrol et (öncelikli)
-                    if "Hex Formatı:" in process_text or "Hex Format:" in process_text or "Base64" in process_text or "base64" in process_text.lower():
-                        # Format etiketinden string'i çıkar
-                        lines = process_text.split('\n')
-                        extracted_line = None
-                        for i, line in enumerate(lines):
-                            line_lower = line.lower()
-                            if "hex format" in line_lower or "base64" in line_lower:
-                                # Sonraki satır hex/base64 string olabilir
-                                if i + 1 < len(lines):
-                                    extracted_line = lines[i + 1].strip()
-                                    break
-                                # Veya aynı satırda olabilir
-                                parts = line.split(':', 1)
-                                if len(parts) > 1:
-                                    extracted_line = parts[1].strip()
-                                    break
-                        
-                        if extracted_line:
-                            process_text = extracted_line
-                    else:
-                        # "Hex Formatı:" yoksa "Şifrelenmiş Metin:" etiketini kontrol et (klasik algoritmalar için)
-                        if "Şifrelenmiş Metin:" in process_text and is_classic_algorithm:
-                            lines = process_text.split('\n')
-                            for i, line in enumerate(lines):
-                                if "Şifrelenmiş Metin:" in line:
-                                    if i + 1 < len(lines) and lines[i + 1].strip():
-                                        extracted_text = lines[i + 1].strip()
-                                        process_text = extracted_text
-                                        Logger.info(f"Klasik algoritma için 'Şifrelenmiş Metin:' etiketinden metin çıkarıldı: {extracted_text}", "MainWindow")
-                                        break
+                    # --- GELİŞMİŞ ETİKET TEMİZLEME ---
+                    # Eğer metin içinde bilinen etiketler varsa, etiketten sonrasını al
+                    labels = [
+                        "Şifrelenmiş Veri (Hex):", "Şifrelenmiş Veri (Base64):", 
+                        "Hex Formatı:", "Hex Format:", "Base64 Formatı:", "Base64 Format:",
+                        "Şifrelenmiş Metin:", "Çözülmüş Veri (Hex):", "RSA_PRIVATE_KEY:",
+                        "ŞİFRELENMİŞ VERİ:"
+                    ]
                     
-                    # Klasik algoritmalar için: Metin sadece harfler/boşluklar içeriyorsa direkt kullan
-                    if is_classic_algorithm:
-                        # Metni temizle ama boşlukları koru
-                        clean_text = process_text.strip()
-                        # Eğer sadece harfler, boşluklar ve noktalama işaretleri varsa direkt kullan
-                        if all(c.isalpha() or c.isspace() or c in '.,!?;:-\'"()[]{}' for c in clean_text):
-                            data = clean_text.encode('utf-8')
-                            Logger.info(f"Klasik algoritma için metin direkt kullanıldı (boşluklar korundu): {len(data)} byte", "MainWindow")
-                        else:
-                            # Hex/Base64 kontrolü yap (boşlukları kaldırarak)
-                            text_clean = clean_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
-                            # Base64 kontrolü
-                            is_base64 = False
-                            if len(text_clean) > 0:
-                                base64_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
-                                if all(c in base64_chars for c in text_clean) and len(text_clean) % 4 == 0:
-                                    try:
-                                        data = b64.b64decode(text_clean)
-                                        Logger.info(f"Base64 string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
-                                        is_base64 = True
-                                    except Exception as e:
-                                        Logger.warning(f"Base64 parse hatası: {str(e)}, hex kontrolüne geçiliyor", "MainWindow")
+                    p_text_lower = process_text.lower()
+                    found_label = False
+                    for label in labels:
+                        if label.lower() in p_text_lower:
+                            # Etiketi bul ve sonrasını al
+                            idx = p_text_lower.find(label.lower())
+                            after_label = process_text[idx + len(label):].strip()
+                            # Eğer birden fazla etiket varsa (örn RSA veya Hex+Base64), 
+                            # bir sonraki etikete kadar olan kısmı almaya çalışabiliriz 
+                            # veya sadece bir sonraki boşluğa bakabiliriz.
+                            # Ama şimdilik sadece satır sonuna veya bir sonraki etikete kadar alalım.
+                            potential_text = after_label.split('\n')[0].strip()
+                            if not potential_text and '\n' in after_label:
+                                potential_text = after_label.split('\n')[1].strip()
                             
-                            # Hex kontrolü
-                            if not is_base64:
-                                if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
-                                    try:
-                                        data = bytes.fromhex(text_clean)
-                                        Logger.info(f"Hex string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
-                                    except ValueError as e:
-                                        Logger.warning(f"Hex parse hatası: {str(e)}, normal text olarak işleniyor", "MainWindow")
-                                        data = clean_text.encode('utf-8')
-                                else:
-                                    data = clean_text.encode('utf-8')
-                                    Logger.info(f"Text olarak encode edildi: {len(data)} byte", "MainWindow")
+                            if potential_text:
+                                process_text = potential_text
+                                Logger.info(f"Etiket bulundu ({label}) ve metin ayıklandı.", "MainWindow")
+                                found_label = True
+                                break
+                    
+                    # Eğer klasik algoritma ise ve etiket bulunmadıysa, 
+                    # metni direkt utf-8 olarak encode et (boşlukları korumak önemli)
+                    if is_classic_algorithm and not found_label:
+                        if all(c.isalpha() or c.isspace() or c in '.,!?;:-\'"()[]{}' for c in process_text):
+                            data = process_text.encode('utf-8')
+                        else:
+                            # Yine de hex/base64 olabilir
+                            text_clean = process_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
+                            try:
+                                # Base64 dene
+                                data = b64.b64decode(text_clean)
+                            except:
+                                try:
+                                    # Hex dene
+                                    data = bytes.fromhex(text_clean)
+                                except:
+                                    data = process_text.encode('utf-8')
                     else:
-                        # Modern algoritmalar için: Boşlukları kaldır ve hex/base64 parse et
+                        # Modern algoritmalar için: Boşlukları temizle ve hex/base64 parse et
                         text_clean = process_text.replace(" ", "").replace("\n", "").replace("\t", "").replace(":", "").replace("-", "")
                         
-                        # Eğer "Şifrelenmiş Metin:" gibi etiketler varsa temizle
-                        if ":" in text_clean:
-                            parts = text_clean.split(":")
-                            if len(parts) > 1:
-                                text_clean = parts[-1]
-                        
                         # Base64 kontrolü
-                        is_base64 = False
-                        if len(text_clean) > 0:
-                            base64_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
-                            if all(c in base64_chars for c in text_clean) and len(text_clean) % 4 == 0:
-                                try:
-                                    data = b64.b64decode(text_clean)
-                                    Logger.info(f"Base64 string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
-                                    is_base64 = True
-                                except Exception as e:
-                                    Logger.warning(f"Base64 parse hatası: {str(e)}, hex kontrolüne geçiliyor", "MainWindow")
-                        
-                        # Hex kontrolü
-                        if not is_base64:
-                            if len(text_clean) > 0 and all(c in '0123456789abcdefABCDEF' for c in text_clean) and len(text_clean) % 2 == 0:
-                                try:
-                                    data = bytes.fromhex(text_clean)
-                                    Logger.info(f"Hex string parse edildi: {len(text_clean)} karakter, {len(data)} byte", "MainWindow")
-                                except ValueError as e:
-                                    Logger.warning(f"Hex parse hatası: {str(e)}, normal text olarak işleniyor", "MainWindow")
-                                    data = process_text.encode('utf-8')
-                            else:
+                        try:
+                            # 4'ün katı olmalı, değilse padding eksik olabilir (ama b64decode bazen halleder)
+                            data = b64.b64decode(text_clean)
+                            Logger.info(f"Metin Base64 olarak parse edildi.", "MainWindow")
+                        except:
+                            try:
+                                # Hex kontrolü
+                                data = bytes.fromhex(text_clean)
+                                Logger.info(f"Metin Hex olarak parse edildi.", "MainWindow")
+                            except:
+                                # Son çare normal utf-8
                                 data = process_text.encode('utf-8')
-                                Logger.info(f"Text olarak encode edildi: {len(data)} byte", "MainWindow")
+                                Logger.info(f"Metin UTF-8 olarak encode edildi.", "MainWindow")
                 else:
                     # Şifreleme için normal encode
                     data = process_text.encode('utf-8')
@@ -522,8 +484,29 @@ class MainWindow:
                 use_library = self.implementation_mode_var.get() == 'library'
                 metadata = {'use_library': use_library, 'impl_mode': 'library' if use_library else 'manual'}
                 
-                # Normal şifreleme
-                response = self.client.process_request(data, operation, algorithm, key, metadata)
+                # Hibrit şifreleme kontrolü
+                if algorithm.startswith("hybrid_"):
+                    if operation == "DECRYPT":
+                        self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Client tarafında hibrit çözme desteklenmez."))
+                        response = None
+                    else:
+                        # Hibrit şifreleme
+                        # "hybrid_aes" -> "aes"
+                        target_algo = algorithm.replace("hybrid_", "")
+                        
+                        # Paket oluştur
+                        packet_bytes = self.hybrid_manager.encrypt_and_package(
+                            message=data,
+                            algorithm=target_algo,
+                            use_manual="manual" in target_algo,
+                            metadata=metadata
+                        )
+                        
+                        # Gönder
+                        response = self.client.send_hybrid_packet(packet_bytes)
+                else:
+                    # Normal şifreleme
+                    response = self.client.process_request(data, operation, algorithm, key, metadata)
 
                 # Debug: Response'u logla
                 if response:
@@ -567,30 +550,23 @@ class MainWindow:
                             import base64
                             base64_result = base64.b64encode(result_data).decode('utf-8')
                             
-                            # AES/DES gibi modern algoritmalar için sadece hex göster
-                            if algorithm.lower() in ['aes', 'des', 'aes_manual', 'des_manual']:
+                            # AES/DES gibi modern algoritmalar için detaylı göster
+                            if algorithm.lower() in ['aes', 'des', 'aes_manual', 'des_manual', 'rsa', 'rsa_manual', 'aes_lib', 'des_lib', 'rsa_lib']:
                                 result_text = f"Şifrelenmiş Veri (Hex):\n{hex_result}\n\nŞifrelenmiş Veri (Base64):\n{base64_result}\n\nBoyut: {len(result_data)} byte"
                             else:
-                                # Klasik algoritmalar için metin de göster
+                                # Klasik algoritmalar için sadece metni göster (kullanıcı isteği)
                                 try:
                                     text_result = result_data.decode('utf-8', errors='ignore')
-                                    result_text = f"Şifrelenmiş Metin:\n{text_result}\n\nHex Formatı:\n{hex_result}\n\nBase64 Formatı:\n{base64_result}"
+                                    result_text = text_result
                                 except:
-                                    result_text = f"Şifrelenmiş Veri (Hex):\n{hex_result}\n\nBase64 Formatı:\n{base64_result}"
+                                    result_text = hex_result
                     else:
                         # Çözme işlemi için düz metin göster
                         try:
                             result_text = result_data.decode('utf-8', errors='ignore')
-                            # Eğer çözülmüş veri binary ise hex de göster
-                            if not all(32 <= ord(c) <= 126 or c in '\n\r\t' for c in result_text):
-                                hex_result = result_data.hex()
-                                result_text = f"Çözülmüş Metin:\n{result_text}\n\nHex Formatı:\n{hex_result}"
                         except Exception as decode_error:
                             # Decode edilemezse hex olarak göster
-                            hex_result = result_data.hex()
-                            import base64
-                            base64_result = base64.b64encode(result_data).decode('utf-8')
-                            result_text = f"Çözülmüş Veri (Hex):\n{hex_result}\n\nBase64 Formatı:\n{base64_result}\n\nNot: Veri binary formatında olduğu için hex gösteriliyor."
+                            result_text = result_data.hex()
 
                     self.root.after(0, lambda: self.progress_var.set(100))
                     self.root.after(0, lambda: self._update_text_result(result_text))
@@ -650,38 +626,174 @@ class MainWindow:
 
         def process_thread():
             try:
+                self.root.after(0, lambda: self.file_progress_var.set(10))
+                self.root.after(0, lambda: self.file_process_button.config(state="disabled", text="İşleniyor..."))
+                
                 with open(file_path, 'rb') as f:
                     file_data = f.read()
+
+                self.root.after(0, lambda: self.file_progress_var.set(30))
 
                 operation = "ENCRYPT" if self.operation_var.get() == "encrypt" else "DECRYPT"
                 algorithm = self.algorithm_var.get()
                 key = self.key_var.get()
                 algorithm = self.algorithm_var.get()
 
-                # Pigpen cipher anahtar gerektirmez
-                if algorithm != "pigpen" and not key:
-                    messagebox.showwarning("Uyarı", "Lütfen anahtar girin.")
+                # Pigpen cipher ve Hibrit mod anahtar gerektirmez
+                if algorithm != "pigpen" and not algorithm.startswith("hybrid_") and not key:
+                    self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Lütfen anahtar girin."))
+                    self.root.after(0, lambda: self.file_progress_var.set(0))
+                    self.root.after(0, lambda: self.file_process_button.config(state="normal", text="Dosyayı İşle"))
                     return
 
                 # Mod bilgisini metadata'ya ekle
                 use_library = self.implementation_mode_var.get() == 'library'
-                metadata = {'use_library': use_library, 'impl_mode': 'library' if use_library else 'manual'}
+                metadata = {
+                    'use_library': use_library, 
+                    'impl_mode': 'library' if use_library else 'manual',
+                    'filename': os.path.basename(file_path),
+                    'extension': os.path.splitext(file_path)[1].lower(),
+                    'file_size': len(file_data)
+                }
                 
-                response = self.client.process_request(file_data, operation, algorithm, key, metadata)
+                self.root.after(0, lambda: self.file_progress_var.set(50))
+                
+                if algorithm.startswith("hybrid_"):
+                    if operation == "DECRYPT":
+                        self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Client tarafında hibrit çözme desteklenmez."))
+                        response = None
+                    else:
+                         # Hibrit şifreleme
+                        target_algo = algorithm.replace("hybrid_", "")
+                        packet_bytes = self.hybrid_manager.encrypt_and_package(
+                            message=file_data,
+                            algorithm=target_algo,
+                            use_manual="manual" in target_algo,
+                            metadata=metadata
+                        )
+                        response = self.client.send_hybrid_packet(packet_bytes)
+                else:    
+                    response = self.client.process_request(file_data, operation, algorithm, key, metadata)
+                
+                self.root.after(0, lambda: self.file_progress_var.set(80))
 
                 if response and response.get('success'):
                     result_data = response['data']
                     self._current_file_result = result_data
-
-                    result_info = f"İşlem tamamlandı.\nBoyut: {len(result_data)} bytes"
+                    
+                    # Dosya bilgilerini hazırla
+                    original_filename = os.path.basename(file_path)
+                    original_name, original_ext = os.path.splitext(original_filename)
+                    
+                    if operation == "ENCRYPT":
+                        # Şifreleme: dosya adına .enc ekle
+                        encrypted_filename = original_name + original_ext + ".enc"
+                        self._current_encrypted_filename = encrypted_filename
+                        
+                        # Otomatik olarak EncryptedFiles klasörüne kaydet
+                        encrypted_files_dir = os.path.join("EncryptedFiles", "encrypted")
+                        os.makedirs(encrypted_files_dir, exist_ok=True)
+                        auto_save_path = os.path.join(encrypted_files_dir, encrypted_filename)
+                        
+                        try:
+                            with open(auto_save_path, 'wb') as f:
+                                f.write(result_data)
+                            
+                            # Metadata'yı da kaydet
+                            metadata = {
+                                'algorithm': algorithm,
+                                'key': key,
+                                'original_filename': original_filename,
+                                'original_size': len(file_data),
+                                'encrypted_size': len(result_data),
+                                'operation': 'ENCRYPT'
+                            }
+                            self.file_manager.save_file(result_data, encrypted_filename, metadata)
+                            
+                            result_info = f"✅ Şifreleme tamamlandı!\n\n"
+                            result_info += f"📁 Orijinal Dosya: {original_filename}\n"
+                            result_info += f"📁 Şifreli Dosya: {encrypted_filename}\n"
+                            result_info += f"💾 Otomatik Kayıt: {auto_save_path}\n"
+                            result_info += f"🔐 Algoritma: {algorithm}\n"
+                            result_info += f"🔑 Anahtar: {key}\n"
+                            result_info += f"📊 Orijinal Boyut: {len(file_data):,} bytes\n"
+                            result_info += f"📊 Şifreli Boyut: {len(result_data):,} bytes\n\n"
+                            result_info += f"✅ Dosya otomatik olarak kaydedildi!\n"
+                            result_info += f"💡 Farklı bir yere kaydetmek için 'Sonucu Kaydet' butonunu kullanabilirsiniz."
+                        except Exception as e:
+                            result_info = f"✅ Şifreleme tamamlandı!\n\n"
+                            result_info += f"📁 Orijinal Dosya: {original_filename}\n"
+                            result_info += f"📁 Şifreli Dosya: {encrypted_filename}\n"
+                            result_info += f"🔐 Algoritma: {algorithm}\n"
+                            result_info += f"🔑 Anahtar: {key}\n"
+                            result_info += f"📊 Orijinal Boyut: {len(file_data):,} bytes\n"
+                            result_info += f"📊 Şifreli Boyut: {len(result_data):,} bytes\n\n"
+                            result_info += f"⚠️ Otomatik kayıt hatası: {str(e)}\n"
+                            result_info += f"💾 Dosyayı kaydetmek için 'Sonucu Kaydet' butonuna tıklayın."
+                    else:
+                        # Deşifreleme: .enc uzantısını kaldır
+                        if original_filename.endswith('.enc'):
+                            decrypted_filename = original_filename[:-4]  # .enc'i kaldır
+                        else:
+                            decrypted_filename = original_name + original_ext
+                        self._current_encrypted_filename = decrypted_filename
+                        
+                        # Otomatik olarak EncryptedFiles klasörüne kaydet
+                        encrypted_files_dir = os.path.join("EncryptedFiles", "encrypted")
+                        os.makedirs(encrypted_files_dir, exist_ok=True)
+                        auto_save_path = os.path.join(encrypted_files_dir, decrypted_filename)
+                        
+                        try:
+                            with open(auto_save_path, 'wb') as f:
+                                f.write(result_data)
+                            
+                            # Metadata'yı da kaydet
+                            metadata = {
+                                'algorithm': algorithm,
+                                'key': key,
+                                'encrypted_filename': original_filename,
+                                'decrypted_filename': decrypted_filename,
+                                'encrypted_size': len(file_data),
+                                'decrypted_size': len(result_data),
+                                'operation': 'DECRYPT'
+                            }
+                            self.file_manager.save_file(result_data, decrypted_filename, metadata)
+                            
+                            result_info = f"✅ Deşifreleme tamamlandı!\n\n"
+                            result_info += f"📁 Şifreli Dosya: {original_filename}\n"
+                            result_info += f"📁 Çözülmüş Dosya: {decrypted_filename}\n"
+                            result_info += f"💾 Otomatik Kayıt: {auto_save_path}\n"
+                            result_info += f"🔐 Algoritma: {algorithm}\n"
+                            result_info += f"🔑 Anahtar: {key}\n"
+                            result_info += f"📊 Şifreli Boyut: {len(file_data):,} bytes\n"
+                            result_info += f"📊 Orijinal Boyut: {len(result_data):,} bytes\n\n"
+                            result_info += f"✅ Dosya otomatik olarak kaydedildi!\n"
+                            result_info += f"💡 Farklı bir yere kaydetmek için 'Sonucu Kaydet' butonunu kullanabilirsiniz."
+                        except Exception as e:
+                            result_info = f"✅ Deşifreleme tamamlandı!\n\n"
+                            result_info += f"📁 Şifreli Dosya: {original_filename}\n"
+                            result_info += f"📁 Çözülmüş Dosya: {decrypted_filename}\n"
+                            result_info += f"🔐 Algoritma: {algorithm}\n"
+                            result_info += f"🔑 Anahtar: {key}\n"
+                            result_info += f"📊 Şifreli Boyut: {len(file_data):,} bytes\n"
+                            result_info += f"📊 Orijinal Boyut: {len(result_data):,} bytes\n\n"
+                            result_info += f"⚠️ Otomatik kayıt hatası: {str(e)}\n"
+                            result_info += f"💾 Dosyayı kaydetmek için 'Sonucu Kaydet' butonuna tıklayın."
+                    
+                    self.root.after(0, lambda: self.file_progress_var.set(100))
                     self.root.after(0, lambda: self._update_file_result(result_info))
+                    self.root.after(0, lambda: self.file_process_button.config(state="normal", text="Dosyayı İşle"))
                 else:
                     error_msg = "İşlem başarısız."
                     if response and 'metadata' in response:
                         error_msg = response['metadata'].get('error', error_msg)
+                    self.root.after(0, lambda: self.file_progress_var.set(0))
+                    self.root.after(0, lambda: self.file_process_button.config(state="normal", text="Dosyayı İşle"))
                     self.root.after(0, lambda: messagebox.showerror("Hata", error_msg))
 
             except Exception as e:
+                self.root.after(0, lambda: self.file_progress_var.set(0))
+                self.root.after(0, lambda: self.file_process_button.config(state="normal", text="Dosyayı İşle"))
                 self.root.after(0, lambda: messagebox.showerror("Hata", f"Dosya işleme hatası: {str(e)}"))
 
         threading.Thread(target=process_thread, daemon=True).start()
@@ -801,8 +913,14 @@ class MainWindow:
             messagebox.showwarning("Uyarı", "Kaydedilecek dosya sonucu yok.")
             return
 
+        # Önerilen dosya adını kullan
+        suggested_filename = ""
+        if hasattr(self, '_current_encrypted_filename'):
+            suggested_filename = self._current_encrypted_filename
+        
         filename = filedialog.asksaveasfilename(
             title="Sonucu Kaydet",
+            initialfile=suggested_filename,
             filetypes=[("Tüm Dosyalar", "*.*")]
         )
 
@@ -810,7 +928,7 @@ class MainWindow:
             try:
                 with open(filename, 'wb') as f:
                     f.write(self._current_file_result)
-                messagebox.showinfo("Başarılı", "Dosya kaydedildi.")
+                messagebox.showinfo("Başarılı", f"Dosya kaydedildi:\n{filename}")
             except Exception as e:
                 messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
 
@@ -1190,7 +1308,11 @@ Kütüphanesiz manuel RSA implementasyonu (Eğitim amaçlı).
 Aynı RSA algoritması, ancak kütüphane kullanmadan kodlanmış.
 Miller-Rabin asallık testi, Extended Euclidean algoritması manuel olarak uygulanır.
 
-Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlamak için)"""
+Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlamak için)""",
+
+            "aes_lib": "Kütüphane tabanlı AES (AES ile aynıdır).",
+            "des_lib": "Kütüphane tabanlı DES (DES ile aynıdır).",
+            "rsa_lib": "Kütüphane tabanlı RSA (RSA ile aynıdır)."
         }
 
         description = algorithm_descriptions.get(algorithm, "Bilinmeyen algoritma")
@@ -1263,9 +1385,12 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             try:
                 parts = key.split(':', 2)
                 if len(parts) == 1:
+                    # Sadece key string
                     return len(key) >= 8
                 elif len(parts) == 3:
-                    key_size = int(parts[0])
+                    # format: key_size:mode:key
+                    size_str = parts[0].upper().replace("AES-", "").replace("AES", "")
+                    key_size = int(size_str)
                     mode = parts[1].upper()
                     key_val = parts[2]
                     return key_size in [128, 192, 256] and mode in ['ECB', 'CBC', 'CFB', 'OFB', 'CTR', 'GCM'] and len(key_val) >= 8
@@ -1273,19 +1398,22 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             except ValueError:
                 return False
 
-        elif algorithm in ["aes_manual", "des_manual"]:
-            return bool(key) and len(key) >= 1
-
         elif algorithm == "des":
             if not key:
                 return False
             try:
-                parts = key.split(':', 1)
+                parts = key.split(':', 2)
                 if len(parts) == 1:
                     return len(key) >= 8
                 elif len(parts) == 2:
+                    # format: mode:key
                     mode = parts[0].upper()
                     key_val = parts[1]
+                    return mode in ['ECB', 'CBC', 'CFB', 'OFB'] and len(key_val) >= 8
+                elif len(parts) == 3:
+                    # format: DES:mode:key
+                    mode = parts[1].upper()
+                    key_val = parts[2]
                     return mode in ['ECB', 'CBC', 'CFB', 'OFB'] and len(key_val) >= 8
                 return False
             except ValueError:
@@ -1325,9 +1453,9 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             "substitution": "Örnek: QWERTYUIOPASDFGHJKLZXCVBNM",
             "route": "Örnek: 3:3:spiral",
             "pigpen": "Anahtar gerekmez",
-            "aes": "Örnek: 128:CBC:my_secret_key_16",
+            "aes": "Örnek: my_secret_key_32",
             "aes_manual": "Örnek: my_secret_key_16",
-            "des": "Örnek: CBC:my_secret",
+            "des": "Örnek: my_secret",
             "des_manual": "Örnek: my_secret",
             "rsa": "Örnek: generate",
             "rsa_manual": "Örnek: generate"
@@ -1349,27 +1477,36 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             self.file_key_entry.config(foreground='black')
 
     def _fill_example_key(self):
-        """Örnek anahtar girer."""
+        """Seçilen algoritmaya göre örnek anahtar girer."""
+
         algorithm = self.algorithm_var.get()
+
         example_keys = {
-            "caesar": "3",
-            "vigenere": "KEYWORD",
-            "affine": "5,8",
-            "hill": "1,2,3,5",
-            "playfair": "MONARCHY",
-            "railfence": "3",
-            "columnar": "KEYWORD",
-            "polybius": "",
-            "substitution": "QWERTYUIOPASDFGHJKLZXCVBNM",
-            "route": "3:3:spiral",
-            "pigpen": "",
-            "aes": "128:CBC:my_secret_key_16",
-            "aes_manual": "my_secret_key_16",
-            "des": "CBC:my_secret",
-            "des_manual": "my_secret",
-            "rsa": "generate",
+            # Klasik Şifreleme Algoritmaları
+            "caesar": "3",                          # Kaydırma miktarı
+            "vigenere": "KEY",                      # Anahtar kelime
+            "affine": "5,8",                        # a,b (a ile 26 aralarında asal)
+            "hill": "1,2,3,5",                      # 2x2 matris (det ≠ 0 mod 26)
+            "playfair": "MONARCHY",                 # Anahtar kelime
+            "railfence": "3",                       # Ray sayısı
+            "columnar": "KEY",                      # Sütun anahtarı
+            "polybius": "",                         # Anahtar gerekmez
+            "substitution": "QWERTYUIOPASDFGHJKLZXCVBNM",  # 26 harf
+            "route": "3:3:spiral",                  # SatırxSütun:Yöntem
+            "pigpen": "",                           # Anahtar gerekmez
+
+            # Modern Simetrik Şifreleme
+            "aes": "secretkey12345678",      # key_size:Mod:key
+            "aes_manual": "secretkey12345678",      # 16 byte key (AES-128)
+
+            "des": "8bytekey",                   # Mod:key
+            "des_manual": "8bytekey",                # 8 byte key
+
+            # Asimetrik Şifreleme
+            "rsa": "generate",                       # Otomatik anahtar üret
             "rsa_manual": "generate"
         }
+
 
         example_key = example_keys.get(algorithm, "")
         
@@ -1401,6 +1538,74 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
         about_text = "Kriptoloji Projesi\nŞifreleme/Çözme Sistemi\n\nPython + Tkinter + Socket tabanlı kriptoloji sistemi"
         messagebox.showinfo("Hakkında", about_text)
 
+    def _show_decryption_help(self):
+        """Deşifreleme işlemi için yardım mesajı gösterir"""
+        help_text = """🔓 ŞİFRELENMİŞ DOSYAYI DEŞİFRELEME REHBERİ
+
+📋 ADIM ADIM İŞLEM:
+
+1️⃣  DOSYA SEÇİMİ
+   • "Dosya Seç" butonuna tıklayın
+   • Şifrelenmiş dosyayı seçin (örn: dosya.png.enc)
+   • Dosya bilgileri otomatik gösterilir
+
+2️⃣  İŞLEM TÜRÜNÜ SEÇİN
+   • "Çöz" radio button'unu seçin
+   • Bu işlem türünü DECRYPT olarak ayarlar
+
+3️⃣  ALGORİTMA VE ANAHTAR GİRİN
+   • Şifreleme sırasında kullanılan algoritmayı seçin
+   • Şifreleme sırasında kullanılan anahtarı girin
+   ⚠️  ÖNEMLİ: Algoritma ve anahtar şifreleme ile AYNI olmalı!
+
+4️⃣  SERVER BAĞLANTISI
+   • Server'a bağlı olduğunuzdan emin olun
+   • Bağlantı yoksa "Bağlan" butonuna tıklayın
+
+5️⃣  DEŞİFRELEME İŞLEMİ
+   • "Dosyayı İşle" butonuna tıklayın
+   • İşlem progress bar'da gösterilir
+   • Server tarafında deşifreleme yapılır
+
+6️⃣  SONUCU KAYDETME
+   • Deşifrelenmiş dosya bilgileri gösterilir
+   • "Sonucu Kaydet" butonuna tıklayın
+   • Dosya adı otomatik önerilir (.enc uzantısı kaldırılır)
+
+📌 ÖNEMLİ NOTLAR:
+
+✅ Server ekranında şifreleme yapıldığında gösterilen bilgileri kaydedin:
+   • Kullanılan Algoritma
+   • Kullanılan Anahtar
+   • Şifrelenmiş Dosya Adı
+
+✅ Deşifreleme için bu bilgilerin TAMAMINI doğru girmeniz gerekir!
+
+✅ Dosya türü önemli değildir (resim, ses, video, txt vb.)
+   Tüm dosyalar binary olarak işlenir.
+
+❌ Yanlış algoritma veya anahtar girerseniz deşifreleme başarısız olur!
+
+💡 İPUCU: Server ekranındaki bilgileri kopyalayıp kullanabilirsiniz."""
+        
+        # Büyük bir pencere açmak için messagebox yerine Toplevel kullan
+        help_window = tk.Toplevel(self.root)
+        help_window.title("Deşifreleme Yardımı")
+        help_window.geometry("700x650")
+        help_window.resizable(True, True)
+        
+        # Scrollable text widget
+        text_frame = ttk.Frame(help_window, padding="10")
+        text_frame.pack(fill=tk.BOTH, expand=True)
+        
+        help_text_widget = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD, font=("Arial", 10))
+        help_text_widget.pack(fill=tk.BOTH, expand=True)
+        help_text_widget.insert("1.0", help_text)
+        help_text_widget.config(state=tk.DISABLED)
+        
+        # Kapat butonu
+        ttk.Button(help_window, text="Kapat", command=help_window.destroy).pack(pady=10)
+
     def _on_closing(self):
         if self.client:
             self.client.disconnect()
@@ -1409,3 +1614,25 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
     def run(self):
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
         self.root.mainloop()
+    def _on_algorithm_changed(self, event=None):
+        algo = self.algorithm_var.get()
+        
+        # Hibrit modda anahtar girişini kapat
+        if algo.startswith("hybrid_"):
+            self.key_entry.delete(0, tk.END)
+            self.key_entry.config(state="disabled")
+            self.file_key_entry.delete(0, tk.END)
+            self.file_key_entry.config(state="disabled")
+            self.key_info_label.config(text="Otomatik üretilir")
+            self.file_key_info_label.config(text="Otomatik üretilir")
+            # Hibrit sadece şifreleme modunda çalışır (Client tarafında)
+            # Çözme işlemi server'da yapılır veya client'ta çözüm logic'i farklıdır
+            # Ama şimdilik sadece gönderme (encrypt) odaklı
+            
+        else:
+            self.key_entry.config(state="normal")
+            self.file_key_entry.config(state="normal")
+            
+            # Algoritma değişikliğinde placeholder veya key bilgisi güncelle
+            # (Mevcut logic varsa buraya eklenebilir)
+            pass

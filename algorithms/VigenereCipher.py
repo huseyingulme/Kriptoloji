@@ -10,6 +10,7 @@ class VigenereCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Vigenère Cipher"
+        self.supports_binary = False
         self.description = "Çok alfabeli kaydırma tabanlı klasik şifreleme algoritması"
         self.key_type = "string"
         self.min_key_length = 1

@@ -13,6 +13,7 @@ class ColumnarTranspositionCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Columnar Transposition Cipher"
+        self.supports_binary = False
         self.description = "Sütunlu yer değiştirme tabanlı klasik şifreleme"
         self.key_type = "string"
         self.min_key_length = 1

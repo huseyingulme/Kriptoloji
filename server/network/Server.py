@@ -42,13 +42,14 @@ class Server:
         self.port = port or config_manager.get("server.port", 12345)
         self.socket: Optional[socket.socket] = None
         self.running = False
-        self.clients = []  # Bağlı client'ların listesi
+        self.clients = {}  # Bağlı clientlar {address: socket}
         self.processing_callback: Optional[Callable] = None  # Şifreleme işlemlerini yapan callback
         self.key_manager = None  # RSA anahtar yönetimi
         self.hybrid_decryption_manager = None  # Hibrit çözme yöneticisi
         self.max_clients = config_manager.get("server.max_clients", 10)
         self.timeout = config_manager.get("server.timeout", 30)
         self.operation_callback: Optional[Callable] = None  # İşlem logları için callback
+        self.request_counter = 0
 
     def start(self):
         """
@@ -105,7 +106,7 @@ class Server:
                         daemon=True
                     )
                     client_thread.start()
-                    self.clients.append((client_socket, client_address))
+                    self.clients[client_address] = client_socket
 
                 except socket.timeout:
                     # Timeout normal, devam et
@@ -138,17 +139,16 @@ class Server:
         """
         try:
             while self.running:
-                # Client'tan veri al
-                data = client_socket.recv(4096)
-                if not data:
-                    break
-
                 try:
-                    # Paketi parse et (Wireshark modu kontrolü)
-                    packet_data, packet_type, metadata = DataPacket.parse_packet(data, use_json_format=WIRESHARK_MODE)
+                    # Paketi al (Robust yöntem)
+                    packet_data, packet_type, metadata = DataPacket.receive_packet(client_socket, use_json_format=WIRESHARK_MODE)
                     
-                    if WIRESHARK_MODE:
-                        Logger.info(f"[WIRESHARK MODE] JSON paket alındı: {data.decode('utf-8', errors='ignore')[:200]}...", "Server")
+                    if packet_type == "DISCONNECTED":
+                        break
+                        
+                    if packet_type == "ERROR":
+                        Logger.error(f"Paket alma hatası: {metadata.get('error', 'Bilinmeyen hata')}", "Server")
+                        break
 
                     # PING isteği - Server'ın çalıştığını kontrol etmek için
                     if packet_type == 'PING':
@@ -164,17 +164,6 @@ class Server:
                     if packet_type == 'HYBRID_ENCRYPT':
                         self._process_hybrid_request(client_socket, packet_data)
                         continue
-
-                    # Parçalı veri ise birleştir
-                    if packet_type == 'CHUNK':
-                        chunks = [data]
-                        while len(chunks) < metadata.get('total_chunks', 1):
-                            chunk_data = client_socket.recv(4096)
-                            if chunk_data:
-                                chunks.append(chunk_data)
-
-                        packet_data = DataPacket.reassemble_chunks(chunks)
-                        _, packet_type, metadata = DataPacket.parse_packet(packet_data)
 
                     # Şifreleme/deşifreleme isteği
                     if packet_type in ['ENCRYPT', 'DECRYPT']:
@@ -192,8 +181,8 @@ class Server:
         finally:
             # Bağlantıyı kapat
             client_socket.close()
-            if (client_socket, client_address) in self.clients:
-                self.clients.remove((client_socket, client_address))
+            if client_address in self.clients:
+                del self.clients[client_address]
             Logger.info(f"Client bağlantısı kapatıldı: {client_address}", "Server")
 
     def _send_pong(self, client_socket: socket.socket):
@@ -230,31 +219,61 @@ class Server:
             self._send_error(client_socket, f"Public key gönderme hatası: {str(e)}")
 
     def _process_hybrid_request(self, client_socket: socket.socket, packet: bytes):
-        """Hibrit şifreleme paketini işler."""
+        """Hibrit şifreleme paketini işler (Manuel mod için güncellendi)."""
         try:
             if not self.hybrid_decryption_manager:
                 self._send_error(client_socket, "Hibrit çözme yöneticisi bulunamadı")
                 return
 
-            # Hibrit paketi çöz
-            decrypted_message = self.hybrid_decryption_manager.decrypt_message(packet)
+            # Paketi parse et ama ÇÖZME
+            packet_data = self.hybrid_decryption_manager.parse_hybrid_packet(packet)
             
-            # Başarılı sonuç
-            result_metadata = {
-                'type': 'RESULT',
-                'algorithm': 'hybrid',
-                'operation': 'DECRYPT',
+            # Metadata'ya timestamp ekle
+            packet_data['timestamp'] = time.time()
+            packet_data['client'] = client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown'
+            packet_data['raw_packet'] = packet # Orijinal paketi sakla
+
+            # GUI'ye bildir (Paket alındı)
+            if self.operation_callback:
+                self.operation_callback({
+                    'type': 'hybrid_packet_received',
+                    'client': packet_data['client'],
+                    'algorithm': packet_data['algorithm'],
+                    'packet_data': packet_data,
+                    'timestamp': time.time()
+                })
+
+            # Client'a "Alındı" bilgisi gönder (Sonuç değil!)
+            ack_metadata = {
+                'type': 'ACK',
+                'message': 'Paket server tarafından alındı, şifre çözümü bekleniyor.',
                 'timestamp': time.time()
             }
-            result_packet = DataPacket.create_packet(decrypted_message, 'RESULT', result_metadata)
-            client_socket.sendall(result_packet)
-            Logger.info("Hibrit paket çözüldü", "Server")
+            ack_packet = DataPacket.create_packet(b"PACKET_RECEIVED", 'ACK', ack_metadata, use_json_format=WIRESHARK_MODE)
+            client_socket.sendall(ack_packet)
+            
+            Logger.info("Hibrit paket alındı ve kuyruğa eklendi", "Server")
             
         except Exception as e:
             Logger.error(f"Hibrit paket işleme hatası: {str(e)}", "Server")
             import traceback
             Logger.debug(f"Detaylı hata: {traceback.format_exc()}", "Server")
             self._send_error(client_socket, f"Hibrit paket işleme hatası: {str(e)}")
+
+    def decrypt_manual(self, packet_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Saklanan paketi manuel olarak çözer.
+        
+        Args:
+            packet_data: Parse edilmiş paket verisi
+            
+        Returns:
+            Dict: Çözülmüş mesaj ve anahtar bilgisi
+        """
+        if not self.hybrid_decryption_manager:
+            raise ValueError("Hibrit çözme yöneticisi bulunamadı")
+            
+        return self.hybrid_decryption_manager.decrypt_message(packet_data['raw_packet'], return_dict=True)
 
     def _process_request(self, client_socket: socket.socket, data: bytes,
                         operation: str, metadata: Dict[str, Any]):
@@ -263,7 +282,7 @@ class Server:
         
         İşlem Adımları:
         1. Metadata'dan algoritma ve anahtarı alır
-        2. ProcessingManager'a yönlendirir
+        2. ProcessingManager'a yönlendir
         3. Sonucu client'a gönderir
         
         ÖNEMLİ: Tüm şifreleme işlemi burada yapılır!
@@ -288,12 +307,32 @@ class Server:
             # İşlem başlangıcını logla
             if self.operation_callback:
                 try:
+                    # Veri önizleme (Text veya Hex)
+                    data_preview = ""
+                    is_binary = False
+                    try:
+                        data_preview = data.decode('utf-8')
+                    except:
+                        data_preview = data.hex()
+                        is_binary = True
+
+                    # Metadata'dan dosya bilgilerini al
+                    filename = metadata.get('filename', '')
+                    file_extension = metadata.get('extension', '')
+                    file_size = metadata.get('file_size', 0)
+                    
                     self.operation_callback({
                         'type': 'operation_start',
                         'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
                         'operation': operation,
                         'algorithm': algorithm,
+                        'key': key,
+                        'input_data': data_preview,
+                        'is_binary': is_binary,
                         'data_size': len(data),
+                        'filename': filename,
+                        'extension': file_extension,
+                        'file_size': file_size if file_size > 0 else len(data),
                         'timestamp': time.time()
                     })
                 except:
@@ -327,13 +366,36 @@ class Server:
                     # İşlem başarısını logla
                     if self.operation_callback:
                         try:
+                            # Sonuç verisi önizleme
+                            result_data = result.get('data', b'')
+                            result_preview = ""
+                            res_is_binary = False
+                            try:
+                                result_preview = result_data.decode('utf-8')
+                            except:
+                                result_preview = result_data.hex()
+                                res_is_binary = True
+
+                            # Metadata'dan dosya bilgilerini al
+                            filename = metadata.get('filename', '')
+                            file_extension = metadata.get('extension', '')
+                            file_size = metadata.get('file_size', 0)
+                            
                             self.operation_callback({
                                 'type': 'operation_success',
                                 'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
                                 'operation': operation,
                                 'algorithm': algorithm,
+                                'key': key,
+                                'input_data': data_preview,
+                                'output_data': result_preview,
+                                'is_binary': is_binary,
+                                'res_is_binary': res_is_binary,
                                 'data_size': len(data),
-                                'result_size': len(result.get('data', b'')),
+                                'result_size': len(result_data),
+                                'filename': filename,
+                                'extension': file_extension,
+                                'file_size': file_size if file_size > 0 else len(data),
                                 'timestamp': time.time()
                             })
                         except:
@@ -352,6 +414,7 @@ class Server:
                                 'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
                                 'operation': operation,
                                 'algorithm': algorithm,
+                                'key': key,
                                 'error': error_msg,
                                 'timestamp': time.time()
                             })

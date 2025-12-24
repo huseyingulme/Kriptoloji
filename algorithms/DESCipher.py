@@ -37,7 +37,7 @@ class DESCipher(BaseCipher):
     def _parse_key_string(self, key_string: str) -> Tuple[str, str]:
         """Anahtar dizesini mod ve key string olarak ayrıştırır."""
         
-        parts = key_string.split(':', 1)
+        parts = key_string.split(':')
 
         if len(parts) == 1:
             mode = self.DEFAULT_MODE
@@ -45,6 +45,13 @@ class DESCipher(BaseCipher):
         elif len(parts) == 2:
             mode = parts[0].upper()
             key_str = parts[1]
+        elif len(parts) == 3:
+            # "DES:CBC:key" formatını destekle
+            if parts[0].upper() == "DES":
+                mode = parts[1].upper()
+                key_str = parts[2]
+            else:
+                raise ValueError("Geçersiz DES anahtar formatı. Doğru format: 'key' veya 'mode:key' veya 'DES:mode:key'")
         else:
             raise ValueError("Geçersiz anahtar formatı. Doğru format: 'key' veya 'mode:key'")
 

@@ -12,6 +12,7 @@ class PigpenCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Pigpen Cipher"
+        self.supports_binary = False
         self.description = "Harflere özel semboller atayan sembol tabanlı klasik şifreleme tekniği"
         self.key_type = "none"
         self.min_key_length = 0

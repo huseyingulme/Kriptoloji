@@ -17,10 +17,12 @@ class CaesarCipher(BaseCipher):
     - Yalnızca harfler (A-Z, a-z) kaydırılır
     - Rakamlar, boşluklar ve noktalama işaretleri olduğu gibi kalır
     """
+    supports_binary = False
 
     def __init__(self):
         super().__init__()
         self.name = "Caesar Cipher"
+        self.supports_binary = False
         self.description = "Her harfi belirtilen miktarda kaydıran klasik şifreleme algoritması"
         self.key_type = "integer"
         self.min_key_length = 1

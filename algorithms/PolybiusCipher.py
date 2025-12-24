@@ -7,6 +7,7 @@ class PolybiusCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Polybius Cipher"
+        self.supports_binary = False
         self.description = "5x5 Polybius karesi ile satır-sütun konum şifreleme"
         self.key_type = "string"
         self.min_key_length = 1
@@ -77,7 +78,7 @@ class PolybiusCipher(BaseCipher):
             text = self._clean_text(data.decode("utf-8", errors="ignore"))
 
             if not text:
-                raise ValueError("Şifrelenecek geçerli metin yok")
+                return data
 
             table = self._create_table(key)
 

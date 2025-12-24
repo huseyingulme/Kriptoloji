@@ -130,22 +130,11 @@ class Client:
             # Paket oluştur (Wireshark modu kontrolü)
             packet = DataPacket.create_packet(data, operation, metadata, use_json_format=WIRESHARK_MODE)
 
-            # Wireshark modunda JSON formatında gönder (büyük verileri parçalara bölme)
+            # Paketi gönder (TCP sendall her şeyi halleder)
+            self.socket.sendall(packet)
+            
             if WIRESHARK_MODE:
-                self.socket.sendall(packet)
                 Logger.info(f"[WIRESHARK MODE] JSON paket gönderildi: {packet.decode('utf-8', errors='ignore')[:200]}...", "Client")
-            else:
-                # Büyük verileri parçalara böl (1024 byte'dan büyükse)
-                if len(packet) > 1024:
-                    chunks = DataPacket.create_chunked_packet(packet, 1024)
-                    
-                    # Her parçayı sırayla gönder
-                    for i, chunk in enumerate(chunks):
-                        self.socket.send(chunk)
-                        Logger.debug(f"Chunk {i+1}/{len(chunks)} gönderildi", "Client")
-                else:
-                    # Küçük verileri direkt gönder
-                    self.socket.send(packet)
 
             Logger.info(f"İşlem talebi gönderildi: {operation} - {algorithm}", "Client")
             return True
@@ -173,14 +162,8 @@ class Client:
             metadata = {'type': 'HYBRID_ENCRYPT', 'timestamp': time.time()}
             hybrid_packet = DataPacket.create_packet(packet, 'HYBRID_ENCRYPT', metadata)
             
-            # Büyük verileri parçalara böl
-            if len(hybrid_packet) > 1024:
-                chunks = DataPacket.create_chunked_packet(hybrid_packet, 1024)
-                for i, chunk in enumerate(chunks):
-                    self.socket.send(chunk)
-                    Logger.debug(f"Chunk {i+1}/{len(chunks)} gönderildi", "Client")
-            else:
-                self.socket.send(hybrid_packet)
+            # Direkt gönder
+            self.socket.sendall(hybrid_packet)
 
             Logger.info("Hibrit paket gönderildi", "Client")
             
@@ -209,32 +192,19 @@ class Client:
             return None
 
         try:
-            # Server'dan veri al
-            response_data = self.socket.recv(4096)
+            # Paketi al (Robust yöntem)
+            data, packet_type, metadata = DataPacket.receive_packet(self.socket, use_json_format=WIRESHARK_MODE)
 
-            if not response_data:
-                Logger.warning("Server'dan boş cevap alındı", "Client")
+            if packet_type == "DISCONNECTED":
+                self.connected = False
                 return None
-
-            # Paketi parse et (Wireshark modu kontrolü)
-            data, packet_type, metadata = DataPacket.parse_packet(response_data, use_json_format=WIRESHARK_MODE)
-            
-            if WIRESHARK_MODE:
-                Logger.info(f"[WIRESHARK MODE] JSON cevap alındı: {response_data.decode('utf-8', errors='ignore')[:200]}...", "Client")
-
-            # Parçalı veri ise birleştir (Wireshark modunda chunking yok)
-            if packet_type == 'CHUNK' and not WIRESHARK_MODE:
-                chunks = [response_data]
                 
-                # Tüm parçaları al
-                while len(chunks) < metadata.get('total_chunks', 1):
-                    chunk_data = self.socket.recv(4096)
-                    if chunk_data:
-                        chunks.append(chunk_data)
-
-                # Parçaları birleştir
-                data = DataPacket.reassemble_chunks(chunks)
-                _, packet_type, metadata = DataPacket.parse_packet(data)
+            if packet_type == "ERROR" and not data:
+                return {
+                    'success': False,
+                    'error': metadata.get('error', 'Bilinmeyen server hatası'),
+                    'type': 'ERROR'
+                }
 
             # Başarı kontrolü
             is_success = packet_type in ['RESULT', 'SUCCESS', 'PONG', 'PUBLIC_KEY'] and packet_type not in ['ERROR', 'FAILED']
@@ -383,13 +353,11 @@ class Client:
             ping_metadata = {'type': 'PING', 'timestamp': time.time()}
             packet = DataPacket.create_packet(ping_data, 'PING', ping_metadata, use_json_format=WIRESHARK_MODE)
 
-            self.socket.send(packet)
+            self.socket.sendall(packet)
 
-            # Pong cevabı bekle
-            response = self.socket.recv(1024)
-            if response:
-                _, packet_type, _ = DataPacket.parse_packet(response, use_json_format=WIRESHARK_MODE)
-                return packet_type == 'PONG'
+            # Pong cevabı bekle (Robust yöntem)
+            _, packet_type, _ = DataPacket.receive_packet(self.socket, use_json_format=WIRESHARK_MODE)
+            return packet_type == 'PONG'
 
             return False
 
@@ -414,18 +382,16 @@ class Client:
             handshake_metadata = {'type': 'HANDSHAKE', 'timestamp': time.time()}
             packet = DataPacket.create_packet(handshake_data, 'HANDSHAKE', handshake_metadata, use_json_format=WIRESHARK_MODE)
 
-            self.socket.send(packet)
+            self.socket.sendall(packet)
 
-            # Public key cevabı bekle
-            response = self.socket.recv(8192)  # RSA key için daha büyük buffer
-            if response:
-                data, packet_type, metadata = DataPacket.parse_packet(response, use_json_format=WIRESHARK_MODE)
-                if packet_type == 'PUBLIC_KEY':
-                    Logger.info("RSA public key alındı", "Client")
-                    return data
-                else:
-                    Logger.warning(f"Beklenmeyen paket tipi: {packet_type}", "Client")
-                    return None
+            # Public key cevabı bekle (Robust yöntem)
+            data, packet_type, metadata = DataPacket.receive_packet(self.socket, use_json_format=WIRESHARK_MODE)
+            if packet_type == 'PUBLIC_KEY':
+                Logger.info("RSA public key alındı", "Client")
+                return data
+            else:
+                Logger.warning(f"Beklenmeyen paket tipi: {packet_type}", "Client")
+                return None
 
             return None
 

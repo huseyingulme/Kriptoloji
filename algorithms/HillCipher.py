@@ -14,6 +14,7 @@ class HillCipher(BaseCipher):
     def __init__(self):
         super().__init__()
         self.name = "Hill Cipher"
+        self.supports_binary = False
         self.description = "Matris tabanlı klasik şifreleme algoritması"
         self.key_type = "matrix"
         self.key_description = "2x2 veya 3x3 matris — örnek: 1,2,3,4"
@@ -31,6 +32,8 @@ class HillCipher(BaseCipher):
 
             text = data.decode("utf-8", errors="ignore")
             text = "".join(c.upper() for c in text if c.isalpha())
+            if not text:
+                return data
 
             # Blok uzunluğunu matrise göre tamamla
             while len(text) % self.matrix_size != 0:
@@ -46,7 +49,9 @@ class HillCipher(BaseCipher):
             return result.encode("utf-8")
 
         except Exception as e:
-            raise Exception(f"Şifreleme hatası: {str(e)}")
+            from shared.utils import Logger
+            Logger.error(f"Hill Cipher hatası: {str(e)}", "HillCipher")
+            raise e
 
     # =======================================================================
     # DECRYPT

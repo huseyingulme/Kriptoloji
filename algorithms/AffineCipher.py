@@ -19,6 +19,7 @@ class AffineCipher(BaseCipher):
     """
     Affine Cipher algoritmasının temiz ve optimize implementasyonu.
     """
+    supports_binary = False
 
     def __init__(self):
         super().__init__()
@@ -116,11 +117,11 @@ class AffineCipher(BaseCipher):
         """Tek bir karakteri çözer."""
         if 65 <= byte <= 90:  # A–Z
             y = byte - 65
-            return (a_inv * (y - b)) % 26 + 65
+            return ((a_inv * (y - b)) % 26) + 65
 
         if 97 <= byte <= 122:  # a–z
             y = byte - 97
-            return (a_inv * (y - b)) % 26 + 97
+            return ((a_inv * (y - b)) % 26) + 97
 
         return byte
 

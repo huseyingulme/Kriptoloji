@@ -2,7 +2,7 @@ import json
 import struct
 import hashlib
 import os
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 
 class DataPacket:
 
@@ -58,7 +58,9 @@ class DataPacket:
             
             # JSON string (compact format, Wireshark için optimize edilmiş)
             json_str = json.dumps(json_packet, ensure_ascii=False, separators=(',', ':'))
-            return json_str.encode('utf-8')
+            json_bytes = json_str.encode('utf-8')
+            # Başına 4 byte uzunluk bilgisi ekle (Böylece büyük dosyalar bölünmeden okunabilir)
+            return struct.pack('!I', len(json_bytes)) + json_bytes
 
         # Normal mod: Binary paket formatı
         metadata_json = json.dumps(metadata).encode('utf-8')
@@ -71,31 +73,78 @@ class DataPacket:
         return packet
 
     @staticmethod
+    def recv_exact(sock, n):
+        """n baytı tam olarak okur."""
+        data = b''
+        while len(data) < n:
+            try:
+                packet = sock.recv(n - len(data))
+                if not packet:
+                    return None
+                data += packet
+            except (ConnectionResetError, ConnectionAbortedError):
+                return None
+        return data
+
+    @staticmethod
+    def receive_packet(sock, use_json_format: bool = False) -> Tuple[Optional[bytes], str, Dict[str, Any]]:
+        """Soketten eksiksiz bir paket okur."""
+        if use_json_format:
+            # Wireshark modu için JSON paket okuma
+            try:
+                # Önce 4 byte uzunluk oku
+                header = DataPacket.recv_exact(sock, 4)
+                if not header:
+                    return None, "DISCONNECTED", {}
+                
+                length = struct.unpack('!I', header)[0]
+                # Sonra 'length' kadar veri oku
+                packet = DataPacket.recv_exact(sock, length)
+                if not packet:
+                    return None, "ERROR", {"error": "Eksik JSON verisi"}
+                
+                return DataPacket.parse_packet(packet, use_json_format=True)
+            except Exception as e:
+                Logger.error(f"JSON paket okuma hatası: {str(e)}", "DataPacket")
+                return None, "ERROR", {"error": str(e)}
+
+        # Header oku (4 byte data size + 4 byte metadata size)
+        header = DataPacket.recv_exact(sock, 8)
+        if not header:
+            return None, "DISCONNECTED", {}
+
+        data_size, metadata_size = struct.unpack('!II', header)
+
+        # Metadata oku
+        metadata_raw = DataPacket.recv_exact(sock, metadata_size)
+        if metadata_raw is None:
+            return None, "ERROR", {"error": "Eksik metadata verisi"}
+
+        # Data oku
+        data = DataPacket.recv_exact(sock, data_size)
+        if data is None and data_size > 0:
+            return None, "ERROR", {"error": "Eksik paket verisi"}
+
+        try:
+            metadata = json.loads(metadata_raw.decode('utf-8'))
+        except:
+            metadata = {}
+
+        return data, metadata.get('type', 'UNKNOWN'), metadata
+
+    @staticmethod
     def parse_packet(packet: bytes, use_json_format: bool = False) -> Tuple[bytes, str, Dict[str, Any]]:
         """
-        Paketi parse eder.
-        
-        Args:
-            packet: Parse edilecek paket (bytes)
-            use_json_format: True ise JSON formatında paket beklenir
-        
-        Returns:
-            Tuple[bytes, str, Dict]: (data, packet_type, metadata)
+        Paketi parse eder. (Sadece statik veri için)
         """
-        # Wireshark modu: JSON formatında paket
         if use_json_format:
+            # ... (mevcut JSON parse mantığı aynen kalsın)
             try:
-                # JSON parse et (newline varsa kaldır)
                 packet_str = packet.decode('utf-8').strip()
                 json_data = json.loads(packet_str)
-                
-                # JSON'dan bilgileri çıkar (Wireshark uyumlu format)
-                # Format: {"operation": "ENCRYPT/DECRYPT", "message": "...", "algorithm": "...", "key": "...", "timestamp": ...}
                 message_str = json_data.get('message', '')
                 algorithm = json_data.get('algorithm', '')
                 key = json_data.get('key', '')
-                
-                # Mesajı bytes'a çevir
                 try:
                     data = message_str.encode('utf-8')
                 except:
@@ -104,39 +153,30 @@ class DataPacket:
                         data = base64.b64decode(message_str)
                     except:
                         data = message_str.encode('utf-8', errors='ignore')
-                
-                # Paket tipini belirle (operation'dan al, yoksa type'dan, yoksa default ENCRYPT)
                 packet_type = json_data.get('operation') or json_data.get('type', 'ENCRYPT')
-                
-                # Metadata oluştur (mevcut sistemle uyumlu)
                 metadata = {
                     'type': packet_type,
                     'algorithm': algorithm,
                     'key': key,
                     'timestamp': json_data.get('timestamp', 0)
                 }
-                
-                # Ek metadata bilgilerini ekle
                 for key, value in json_data.items():
                     if key not in ['operation', 'message', 'algorithm', 'key', 'timestamp', 'type']:
                         metadata[key] = value
-                
                 return data, packet_type, metadata
-            except json.JSONDecodeError as e:
-                raise ValueError(f"JSON parse hatası: {str(e)}")
+            except Exception as e:
+                return b"", "ERROR", {"error": str(e)}
 
-        # Normal mod: Binary paket formatı
+        # Normal mod (yalnızca tam paket geldiyse çalışır)
         if len(packet) < 8:
             raise ValueError("Geçersiz paket boyutu")
 
         data_size, metadata_size = struct.unpack('!II', packet[:8])
-
         if len(packet) < 8 + metadata_size + data_size:
             raise ValueError("Eksik paket verisi")
 
         metadata_json = packet[8:8+metadata_size].decode('utf-8')
         metadata = json.loads(metadata_json)
-
         data = packet[8+metadata_size:8+metadata_size+data_size]
 
         return data, metadata.get('type', 'UNKNOWN'), metadata
@@ -199,7 +239,9 @@ class DataPacket:
         
         # JSON string (compact format, Wireshark için optimize edilmiş)
         json_str = json.dumps(json_response, ensure_ascii=False, separators=(',', ':'))
-        return json_str.encode('utf-8')
+        json_bytes = json_str.encode('utf-8')
+        # Başına 4 byte uzunluk bilgisi ekle
+        return struct.pack('!I', len(json_bytes)) + json_bytes
 
     @staticmethod
     def reassemble_chunks(chunks: List[bytes]) -> bytes:
