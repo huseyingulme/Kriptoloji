@@ -43,7 +43,7 @@ class MainWindow:
             "caesar", "vigenere", "affine", "hill", "playfair", "railfence", "columnar", "polybius",
             "substitution", "route", "pigpen",
             # Modern Simetrik Şifreleme (Kütüphaneli)
-            "aes", "des",
+            "aes", "des", "idea", "iron",
             # Modern Simetrik Şifreleme (Manuel)
             "aes_manual", "des_manual",
             # Asimetrik Şifreleme
@@ -550,8 +550,8 @@ class MainWindow:
                             import base64
                             base64_result = base64.b64encode(result_data).decode('utf-8')
                             
-                            # AES/DES gibi modern algoritmalar için detaylı göster
-                            if algorithm.lower() in ['aes', 'des', 'aes_manual', 'des_manual', 'rsa', 'rsa_manual', 'aes_lib', 'des_lib', 'rsa_lib']:
+                            # AES/DES/IDEA/IRON gibi modern algoritmalar için detaylı göster
+                            if algorithm.lower() in ['aes', 'des', 'aes_manual', 'des_manual', 'rsa', 'rsa_manual', 'aes_lib', 'des_lib', 'rsa_lib', 'idea', 'iron']:
                                 result_text = f"Şifrelenmiş Veri (Hex):\n{hex_result}\n\nŞifrelenmiş Veri (Base64):\n{base64_result}\n\nBoyut: {len(result_data)} byte"
                             else:
                                 # Klasik algoritmalar için sadece metni göster (kullanıcı isteği)
@@ -1084,6 +1084,10 @@ class MainWindow:
             else:
                 self.algorithm_var.set('des')
         
+        # IDEA için
+        elif algorithm == 'idea' :
+            self.algorithm_var.set('idea')
+
         # Algoritma bilgisini güncelle
         self._on_algorithm_changed()
 
@@ -1104,6 +1108,8 @@ class MainWindow:
             "aes_manual": "16 byte anahtar (örn: 'my_secret_key16') - Kütüphanesiz",
             "des": "8 byte anahtar (örn: 'mykey123') - Kütüphaneli",
             "des_manual": "8 byte anahtar (örn: 'mykey123') - Kütüphanesiz",
+            "idea": "16 byte anahtar (örn: 'my_secret_key16') - Kütüphaneli",
+            "iron": "16 byte anahtar (örn: 'iron_key_1234567')",
             "rsa": "RSA anahtar çifti (otomatik üretilir)"
         }
         return key_infos.get(algorithm, "")
@@ -1310,9 +1316,42 @@ Miller-Rabin asallık testi, Extended Euclidean algoritması manuel olarak uygul
 
 Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlamak için)""",
 
+            "idea": """IDEA (INTERNATIONAL DATA ENCRYPTION ALGORITHM)
+Modern simetrik blok şifreleme algoritması (Kütüphaneli).
+
+Mimari: Karıştırma ve Yayılma (Substitution-Permutation benzeri)
+
+Özellikler:
+- Blok Boyutu: 64 bit (8 byte)
+- Anahtar Boyutu: 128 bit (16 byte)
+- Tur Sayısı: 8.5 Tur
+- İşlemler: XOR, Mod 2^16 toplama, Mod (2^16 + 1) çarpma
+
+Güvenlik: Yüksek (Brute-force'a dayanıklı)""",
+
+            "idea_manual": """IDEA MANUEL İMPLEMENTASYON
+Kütüphanesiz manuel IDEA implementasyonu (Eğitim amaçlı).
+
+8.5 turlu yapı, modular multiplication (mod 65537) ve key schedule manuel olarak kodlanmıştır.
+
+Eğitim Değeri: Yüksek""",
+
             "aes_lib": "Kütüphane tabanlı AES (AES ile aynıdır).",
             "des_lib": "Kütüphane tabanlı DES (DES ile aynıdır).",
-            "rsa_lib": "Kütüphane tabanlı RSA (RSA ile aynıdır)."
+            "rsa_lib": "Kütüphane tabanlı RSA (RSA ile aynıdır).",
+
+            "iron": """IRON (INTERNATIONAL DATA ENCRYPTION ALGORITHM - FEISTEL)
+Modern simetrik blok şifreleme algoritması (Feistel mimarisi).
+
+Mimari: Feistel Network
+
+Özellikler:
+- Blok Boyutu: 64 bit (8 byte)
+- Anahtar Boyutu: 128 bit (16 byte)
+- Tur Sayısı: Anahtar bağımlı (16 veya 17 tur)
+- S-Box: Anahtar bağımlı dinamik üretilen 4 adet 8x32 kutu
+
+Güvenlik: Yüksek (Dinamik yapısı sayesinde brute-force ve analiz saldırılarına dirençli)"""
         }
 
         description = algorithm_descriptions.get(algorithm, "Bilinmeyen algoritma")
@@ -1379,7 +1418,7 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             # Anahtar gerekmez
             return True
 
-        elif algorithm == "aes":
+        elif algorithm in ["aes", "aes_manual"]:
             if not key:
                 return False
             try:
@@ -1398,7 +1437,7 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             except ValueError:
                 return False
 
-        elif algorithm == "des":
+        elif algorithm in ["des", "des_manual"]:
             if not key:
                 return False
             try:
@@ -1418,6 +1457,24 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
                 return False
             except ValueError:
                 return False
+
+        elif algorithm in ["idea"]:
+             if not key:
+                return False
+             try:
+                parts = key.split(':', 2)
+                if len(parts) == 1:
+                    return len(key) >= 8
+                elif len(parts) == 2:
+                    mode = parts[0].upper()
+                    key_val = parts[1]
+                    return mode in ['ECB', 'CBC', 'CFB', 'OFB'] and len(key_val) >= 8
+                return False
+             except ValueError:
+                return False
+
+        elif algorithm == "iron":
+            return bool(key) and len(key) >= 1
 
         elif algorithm in ["rsa", "rsa_manual"]:
             # RSA için 'generate' veya boş string kabul edilir
@@ -1442,23 +1499,25 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
 
         algorithm = self.algorithm_var.get()
         placeholder_texts = {
-            "caesar": "Örnek: 3",
-            "vigenere": "Örnek: KEYWORD",
-            "affine": "Örnek: 5,8",
-            "hill": "Örnek: 1,2,3,5",
-            "playfair": "Örnek: MONARCHY",
-            "railfence": "Örnek: 3",
-            "columnar": "Örnek: KEYWORD",
-            "polybius": "Opsiyonel",
-            "substitution": "Örnek: QWERTYUIOPASDFGHJKLZXCVBNM",
-            "route": "Örnek: 3:3:spiral",
+            "caesar": "Örnek: 4",
+            "vigenere": "Örnek: SECURITY",
+            "affine": "Örnek: 7,3",
+            "hill": "Örnek: 3,3,2,5",
+            "playfair": "Örnek: CRYPTO",
+            "railfence": "Örnek: 4",
+            "columnar": "Örnek: COLUMN",
+            "polybius": "Anahtar gerekmez",
+            "substitution": "Örnek: MNBVCXZLKJHGFDSAPOIUYTREWQ",
+            "route": "Örnek: 4:4:zigzag",
             "pigpen": "Anahtar gerekmez",
-            "aes": "Örnek: my_secret_key_32",
-            "aes_manual": "Örnek: my_secret_key_16",
-            "des": "Örnek: my_secret",
-            "des_manual": "Örnek: my_secret",
+            "aes": "Örnek: 16byte_AES_key!",
+            "aes_manual": "Örnek: 16byte_AES_key!",
+            "des": "Örnek: DESkey12",
+            "des_manual": "Örnek: DESkey12",
             "rsa": "Örnek: generate",
-            "rsa_manual": "Örnek: generate"
+            "rsa_manual": "Örnek: generate",
+            "idea": "Örnek: IDEA_KEY_128bit",
+            "iron": "Örnek: IRON_KEY_128bit"
         }
 
         placeholder = placeholder_texts.get(algorithm, "")
@@ -1469,6 +1528,7 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
             if hasattr(self, 'file_key_entry'):
                 self.file_key_entry.config(foreground='gray')
 
+
     def _on_key_focus_out(self, event):
 
         if hasattr(self, 'key_entry'):
@@ -1476,45 +1536,51 @@ Eğitim Değeri: Yüksek (asimetrik şifrelemenin matematiksel temellerini anlam
         if hasattr(self, 'file_key_entry'):
             self.file_key_entry.config(foreground='black')
 
+
     def _fill_example_key(self):
         """Seçilen algoritmaya göre örnek anahtar girer."""
 
         algorithm = self.algorithm_var.get()
 
         example_keys = {
-            # Klasik Şifreleme Algoritmaları
-            "caesar": "3",                          # Kaydırma miktarı
-            "vigenere": "KEY",                      # Anahtar kelime
-            "affine": "5,8",                        # a,b (a ile 26 aralarında asal)
-            "hill": "1,2,3,5",                      # 2x2 matris (det ≠ 0 mod 26)
-            "playfair": "MONARCHY",                 # Anahtar kelime
-            "railfence": "3",                       # Ray sayısı
-            "columnar": "KEY",                      # Sütun anahtarı
-            "polybius": "",                         # Anahtar gerekmez
-            "substitution": "QWERTYUIOPASDFGHJKLZXCVBNM",  # 26 harf
-            "route": "3:3:spiral",                  # SatırxSütun:Yöntem
-            "pigpen": "",                           # Anahtar gerekmez
+            # 🔐 Klasik Şifreleme
+            "caesar": "4",
+            "vigenere": "SECURITY",
+            "affine": "7,3",                    # gcd(7,26)=1
+            "hill": "3,3,2,5",                  # det=9 ≠ 0 mod 26
+            "playfair": "CRYPTO",
+            "railfence": "4",
+            "columnar": "COLUMN",
+            "polybius": "",
+            "substitution": "MNBVCXZLKJHGFDSAPOIUYTREWQ",
+            "route": "4:4:zigzag",
+            "pigpen": "",
 
-            # Modern Simetrik Şifreleme
-            "aes": "secretkey12345678",      # key_size:Mod:key
-            "aes_manual": "secretkey12345678",      # 16 byte key (AES-128)
+            # 🔒 Modern Simetrik
+            "aes": "16byte_AES_key!",            # AES-128
+            "aes_manual": "16byte_AES_key!",
+            "des": "DESkey12",                   # 8 byte
+            "des_manual": "DESkey12",
 
-            "des": "8bytekey",                   # Mod:key
-            "des_manual": "8bytekey",                # 8 byte key
+            # 🔑 Asimetrik
+            "rsa": "generate",
+            "rsa_manual": "generate",
 
-            # Asimetrik Şifreleme
-            "rsa": "generate",                       # Otomatik anahtar üret
-            "rsa_manual": "generate"
+            # 🧠 IDEA
+            "idea": "IDEA_KEY_128bit",            # 16 byte / 128-bit
+
+            # 🧪 IRON (özel)
+            "iron": "IRON_KEY_128bit"
         }
 
-
         example_key = example_keys.get(algorithm, "")
-        
+            
         if example_key:
             self.key_var.set(example_key)
-            messagebox.showinfo("Örnek Anahtar", f"Örnek anahtar girildi: {example_key}")
+            messagebox.showinfo("Örnek Anahtar", f"Örnek anahtar girildi:\n{example_key}")
         else:
-            messagebox.showinfo("Bilgi", "Bu algoritma için örnek anahtar yok.")
+            messagebox.showinfo("Bilgi", "Bu algoritma için anahtar gerekmez.")
+
 
     def _on_key_validate(self, event):
 

@@ -161,7 +161,7 @@ class ServerWindow:
         # Algoritma & Key (Metin için)
         ttk.Label(text_tab, text="Algoritma:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         self.man_algo_var = tk.StringVar(value="caesar")
-        algos = ["caesar", "vigenere", "affine", "hill", "playfair", "railfence", "columnar", "polybius", "substitution", "route", "pigpen", "aes", "des", "aes_manual", "des_manual", "rsa", "rsa_manual"]
+        algos = ["caesar", "vigenere", "affine", "hill", "playfair", "railfence", "columnar", "polybius", "substitution", "route", "pigpen", "aes", "des", "idea", "iron", "aes_manual", "des_manual", "rsa", "rsa_manual"]
         self.man_algo_combo = ttk.Combobox(text_tab, textvariable=self.man_algo_var, values=algos, state="readonly")
         self.man_algo_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
 

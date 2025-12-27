@@ -1,7 +1,14 @@
 """
-Route Cipher - Rota Tabanlı Şifreleme
-Metin bir matrise yerleştirilir ve belirli bir rota (spiral, row, column, diagonal)
-izlenerek okunur.
+Route Cipher (Rota Tabanlı Şifreleme)
+
+Plaintext matrise SATIR SATIR yazılır.
+Şifreleme: Matris seçilen rotaya göre okunur.
+Deşifre: Matris seçilen rotaya göre doldurulur, SATIR SATIR okunur.
+
+Desteklenen rotalar:
+- spiral
+- column
+- diagonal
 """
 
 from algorithms.BaseCipher import BaseCipher
@@ -13,99 +20,89 @@ class RouteCipher(BaseCipher):
         super().__init__()
         self.name = "Route Cipher"
         self.supports_binary = False
-        self.description = "Matris içinde seçilen rota ile okuma tabanlı şifreleme"
+        self.description = "Matris ve rota tabanlı klasik şifreleme"
         self.key_type = "string"
         self.min_key_length = 3
         self.max_key_length = 20
         self.key_description = (
-            "Format: rows:cols:type -> Örnek: 3:3:spiral, 4:4:row, 3:3:column"
+            "Format: rows:cols:route → Örnek: 3:3:spiral | 4:4:column | 3:3:diagonal"
         )
-        self.supports_binary = False
 
-    # --------------------------------------------------------------
-    # INTERNAL HELPERS
-    # --------------------------------------------------------------
+    # --------------------------------------------------
+    # KEY PARSER
+    # --------------------------------------------------
 
-    def _parse_key(self, key: str) -> tuple:
-        try:
-            parts = key.split(":")
-            if len(parts) != 3:
-                raise ValueError("Anahtar formatı 'rows:cols:route_type' olmalıdır.")
+    def _parse_key(self, key: str):
+        parts = key.split(":")
+        if len(parts) != 3:
+            raise ValueError("Anahtar formatı rows:cols:route olmalıdır.")
 
-            rows = int(parts[0])
-            cols = int(parts[1])
-            route_type = parts[2].lower()
+        rows = int(parts[0])
+        cols = int(parts[1])
+        route = parts[2].lower()
 
-            if rows < 2 or cols < 2:
-                raise ValueError("Satır/sütun en az 2 olmalıdır.")
+        if rows < 2 or cols < 2:
+            raise ValueError("Satır ve sütun en az 2 olmalıdır.")
 
-            if route_type not in ("spiral", "row", "column", "diagonal"):
-                raise ValueError("Rota spiral, row, column veya diagonal olabilir.")
+        if route not in ("spiral", "column", "diagonal"):
+            raise ValueError("Rota spiral, column veya diagonal olabilir.")
 
-            return rows, cols, route_type
+        return rows, cols, route
 
-        except Exception as e:
-            raise ValueError(f"Anahtar parse hatası: {str(e)}")
+    # --------------------------------------------------
+    # MATRIX HELPERS
+    # --------------------------------------------------
 
-    # --------------------------------------------------------------
-    # MATRIX OPERATIONS
-    # --------------------------------------------------------------
-
-    def _fill_matrix_rowwise(self, text, rows, cols):
-        """Matris satır satır doldurulur."""
+    def _fill_rowwise(self, text, rows, cols):
         matrix = [["" for _ in range(cols)] for _ in range(rows)]
         idx = 0
         for r in range(rows):
             for c in range(cols):
-                matrix[r][c] = text[idx] if idx < len(text) else ""
+                if idx < len(text):
+                    matrix[r][c] = text[idx]
                 idx += 1
         return matrix
 
-    def _read_matrix_rowwise(self, matrix, rows, cols):
-        """Matris satır satır okunur."""
+    def _read_rowwise(self, matrix, rows, cols):
         return "".join(matrix[r][c] for r in range(rows) for c in range(cols))
 
-    # --------------------------------------------------------------
-    # ROUTE READERS
-    # --------------------------------------------------------------
+    # --------------------------------------------------
+    # SPIRAL ROUTE
+    # --------------------------------------------------
 
     def _read_spiral(self, matrix, rows, cols):
-        result = []
+        res = []
         top, bottom = 0, rows - 1
         left, right = 0, cols - 1
 
         while top <= bottom and left <= right:
-
             for c in range(left, right + 1):
-                result.append(matrix[top][c])
+                res.append(matrix[top][c])
             top += 1
 
             for r in range(top, bottom + 1):
-                result.append(matrix[r][right])
+                res.append(matrix[r][right])
             right -= 1
 
             if top <= bottom:
                 for c in range(right, left - 1, -1):
-                    result.append(matrix[bottom][c])
+                    res.append(matrix[bottom][c])
                 bottom -= 1
 
             if left <= right:
                 for r in range(bottom, top - 1, -1):
-                    result.append(matrix[r][left])
+                    res.append(matrix[r][left])
                 left += 1
 
-        return "".join(result)
+        return "".join(res)
 
     def _write_spiral(self, text, rows, cols):
-        """Decrypt için spiral sıraya uygun şekilde matris doldurma."""
         matrix = [["" for _ in range(cols)] for _ in range(rows)]
         idx = 0
-
         top, bottom = 0, rows - 1
         left, right = 0, cols - 1
 
         while top <= bottom and left <= right:
-
             for c in range(left, right + 1):
                 matrix[top][c] = text[idx]
                 idx += 1
@@ -130,6 +127,10 @@ class RouteCipher(BaseCipher):
 
         return matrix
 
+    # --------------------------------------------------
+    # COLUMN ROUTE
+    # --------------------------------------------------
+
     def _read_column(self, matrix, rows, cols):
         return "".join(matrix[r][c] for c in range(cols) for r in range(rows))
 
@@ -141,6 +142,10 @@ class RouteCipher(BaseCipher):
                 matrix[r][c] = text[idx]
                 idx += 1
         return matrix
+
+    # --------------------------------------------------
+    # DIAGONAL ROUTE
+    # --------------------------------------------------
 
     def _read_diagonal(self, matrix, rows, cols):
         res = []
@@ -162,57 +167,45 @@ class RouteCipher(BaseCipher):
                     idx += 1
         return matrix
 
-    # --------------------------------------------------------------
+    # --------------------------------------------------
     # ENCRYPT
-    # --------------------------------------------------------------
+    # --------------------------------------------------
 
     def encrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            rows, cols, route_type = self._parse_key(key)
+        rows, cols, route = self._parse_key(key)
 
-            text = (
-                data.decode("utf-8", errors="ignore")
-                .upper()
-                .replace(" ", "")
-            )
+        text = (
+            data.decode("utf-8", errors="ignore")
+            .upper()
+            .replace(" ", "")
+        )
 
-            matrix = self._fill_matrix_rowwise(text, rows, cols)
+        matrix = self._fill_rowwise(text, rows, cols)
 
-            if route_type == "spiral":
-                encrypted = self._read_spiral(matrix, rows, cols)
-            elif route_type == "row":
-                encrypted = self._read_row(matrix, rows, cols)
-            elif route_type == "column":
-                encrypted = self._read_column(matrix, rows, cols)
-            else:
-                encrypted = self._read_diagonal(matrix, rows, cols)
+        if route == "spiral":
+            cipher = self._read_spiral(matrix, rows, cols)
+        elif route == "column":
+            cipher = self._read_column(matrix, rows, cols)
+        else:
+            cipher = self._read_diagonal(matrix, rows, cols)
 
-            return encrypted.encode("utf-8")
+        return cipher.encode("utf-8")
 
-        except Exception as e:
-            raise Exception(f"Route şifreleme hatası: {str(e)}")
-
-    # --------------------------------------------------------------
+    # --------------------------------------------------
     # DECRYPT
-    # --------------------------------------------------------------
+    # --------------------------------------------------
 
     def decrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            rows, cols, route_type = self._parse_key(key)
+        rows, cols, route = self._parse_key(key)
 
-            text = data.decode("utf-8", errors="ignore").upper()
+        text = data.decode("utf-8", errors="ignore").upper()
 
-            if route_type == "spiral":
-                matrix = self._write_spiral(text, rows, cols)
-            elif route_type == "row":
-                matrix = self._fill_matrix_rowwise(text, rows, cols)
-            elif route_type == "column":
-                matrix = self._write_column(text, rows, cols)
-            else:
-                matrix = self._write_diagonal(text, rows, cols)
+        if route == "spiral":
+            matrix = self._write_spiral(text, rows, cols)
+        elif route == "column":
+            matrix = self._write_column(text, rows, cols)
+        else:
+            matrix = self._write_diagonal(text, rows, cols)
 
-            decrypted = self._read_matrix_rowwise(matrix, rows, cols)
-            return decrypted.encode("utf-8")
-
-        except Exception as e:
-            raise Exception(f"Route çözme hatası: {str(e)}")
+        plain = self._read_rowwise(matrix, rows, cols)
+        return plain.encode("utf-8")

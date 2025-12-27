@@ -1,92 +1,103 @@
 from algorithms.BaseCipher import BaseCipher
-import string
 
 class VigenereCipher(BaseCipher):
     """
-    Vigenère Cipher – Çok alfabeli kaydırma şifrelemesi.
-    Sadece harfler üzerinde işlem yapar, diğer karakterlere dokunmaz.
+    Vigenère Cipher
+    Çok alfabeli (polyalphabetic) klasik şifreleme algoritması.
+    Sadece alfabetik karakterleri şifreler.
     """
 
     def __init__(self):
         super().__init__()
         self.name = "Vigenère Cipher"
-        self.supports_binary = False
         self.description = "Çok alfabeli kaydırma tabanlı klasik şifreleme algoritması"
         self.key_type = "string"
         self.min_key_length = 1
         self.max_key_length = 50
-        self.key_description = "Sadece alfabetik karakterlerden oluşan anahtar (A-Z, a-z)"
+        self.key_description = "Sadece harflerden oluşan anahtar (A-Z, a-z)"
         self.supports_binary = False
 
+    # --------------------------------------------------
+    # Key doğrulama
+    # --------------------------------------------------
     def validate_key(self, key: str) -> bool:
-        """Anahtar doğrulama."""
         if not key:
             return False
-        if not any(c.isalpha() for c in key):
+        if not key.isalpha():
             return False
         return self.min_key_length <= len(key) <= self.max_key_length
 
-    def _prepare_key(self, key: str) -> str:
-        """Anahtarı temizler ve büyük harfe çevirir."""
-        clean = ''.join(c.upper() for c in key if c.isalpha())
-        if not clean:
-            raise ValueError("Anahtar sadece harf içermeli.")
-        return clean
+    # --------------------------------------------------
+    # Key hazırlama (A-Z → 0-25)
+    # --------------------------------------------------
+    def _prepare_key(self, key: str) -> list[int]:
+        """
+        Anahtarı 0–25 arası sayılara çevirir.
+        Örn: 'KEY' → [10, 4, 24]
+        """
+        if not key.isalpha():
+            raise ValueError("Anahtar yalnızca harflerden oluşmalıdır.")
 
+        return [ord(c.upper()) - ord('A') for c in key]
+
+    # --------------------------------------------------
+    # ŞİFRELEME
+    # Ci = (Pi + Ki) mod 26
+    # --------------------------------------------------
     def encrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            key = self._prepare_key(key)
-            result = []
-            key_index = 0
+        key_nums = self._prepare_key(key)
+        result = []
+        key_index = 0
 
-            for b in data:
-                char = chr(b)
+        for byte in data:
+            char = chr(byte)
 
-                if char.isupper():  # A-Z
-                    shift = ord(key[key_index % len(key)]) - 65
-                    enc = (ord(char) - 65 + shift) % 26 + 65
-                    result.append(chr(enc))
-                    key_index += 1
+            if char.isupper():
+                p = ord(char) - ord('A')
+                k = key_nums[key_index % len(key_nums)]
+                c = (p + k) % 26
+                result.append(chr(c + ord('A')))
+                key_index += 1
 
-                elif char.islower():  # a-z
-                    shift = ord(key[key_index % len(key)]) - 65
-                    enc = (ord(char) - 97 + shift) % 26 + 97
-                    result.append(chr(enc))
-                    key_index += 1
+            elif char.islower():
+                p = ord(char) - ord('a')
+                k = key_nums[key_index % len(key_nums)]
+                c = (p + k) % 26
+                result.append(chr(c + ord('a')))
+                key_index += 1
 
-                else:
-                    result.append(char)
+            else:
+                result.append(char)
 
-            return ''.join(result).encode('utf-8')
+        return ''.join(result).encode("utf-8")
 
-        except Exception as e:
-            raise Exception(f"Vigenère şifreleme hatası: {str(e)}")
-
+    # --------------------------------------------------
+    # ÇÖZME
+    # Pi = (Ci - Ki + 26) mod 26
+    # --------------------------------------------------
     def decrypt(self, data: bytes, key: str) -> bytes:
-        try:
-            key = self._prepare_key(key)
-            result = []
-            key_index = 0
+        key_nums = self._prepare_key(key)
+        result = []
+        key_index = 0
 
-            for b in data:
-                char = chr(b)
+        for byte in data:
+            char = chr(byte)
 
-                if char.isupper():  # A-Z
-                    shift = ord(key[key_index % len(key)]) - 65
-                    dec = (ord(char) - 65 - shift) % 26 + 65
-                    result.append(chr(dec))
-                    key_index += 1
+            if char.isupper():
+                c = ord(char) - ord('A')
+                k = key_nums[key_index % len(key_nums)]
+                p = (c - k + 26) % 26
+                result.append(chr(p + ord('A')))
+                key_index += 1
 
-                elif char.islower():  # a-z
-                    shift = ord(key[key_index % len(key)]) - 65
-                    dec = (ord(char) - 97 - shift) % 26 + 97
-                    result.append(chr(dec))
-                    key_index += 1
+            elif char.islower():
+                c = ord(char) - ord('a')
+                k = key_nums[key_index % len(key_nums)]
+                p = (c - k + 26) % 26
+                result.append(chr(p + ord('a')))
+                key_index += 1
 
-                else:
-                    result.append(char)
+            else:
+                result.append(char)
 
-            return ''.join(result).encode('utf-8')
-
-        except Exception as e:
-            raise Exception(f"Vigenère çözme hatası: {str(e)}")
+        return ''.join(result).encode("utf-8")

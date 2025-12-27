@@ -106,8 +106,9 @@ class RSACipher(BaseCipher):
         Returns: bytes: Şifrelenmiş veri (base64 encoded).
         """
         try:
-            # Public key'i ayır (key string'i "pub:priv" formatında gelebilir)
-            if ':' in key:
+            # Public key'i ayır (key string'i "pub:priv" formatında gelebilir veya "generate" olabilir)
+            public_pem = None
+            if ':' in key or key.lower() == 'generate' or not key:
                 public_pem, _, _ = self._parse_key_string(key)
             else:
                 public_pem = key.encode() if isinstance(key, str) and not key.startswith('-----') else key.encode() if isinstance(key, str) else key
@@ -145,7 +146,7 @@ class RSACipher(BaseCipher):
                 length_bytes = len(chunk).to_bytes(4, byteorder='big')
                 result += length_bytes + chunk
             
-            return base64.b64encode(result)
+            return result
         
         except ValueError as e:
             raise ValueError(f"RSA Şifreleme Anahtar/Veri hatası: {str(e)}")
@@ -160,14 +161,12 @@ class RSACipher(BaseCipher):
         Returns: bytes: Çözülmüş veri.
         """
         try:
-            # Base64 decode
-            encrypted_data = base64.b64decode(data)
-            
             # Private key'i ayır
-            if ':' in key:
+            private_pem = None
+            if ':' in key or key.lower() == 'generate' or not key:
                 _, private_pem, _ = self._parse_key_string(key)
             else:
-                private_pem = key.encode() if isinstance(key, str) and not key.startswith('-----') else key.encode() if isinstance(key, str) else key
+                private_pem = key.encode() if isinstance(key, str) else key
             
             private_key = serialization.load_pem_private_key(
                 private_pem,
@@ -179,17 +178,17 @@ class RSACipher(BaseCipher):
             offset = 0
             
             # Parçalı veriyi çözme döngüsü
-            while offset < len(encrypted_data):
+            while offset < len(data):
                 # 4 byte uzunluk bilgisi oku
-                if offset + 4 > len(encrypted_data):
+                if offset + 4 > len(data):
                     raise ValueError("Parçalı veri formatı bozuk: Eksik uzunluk bilgisi.")
-                chunk_length = int.from_bytes(encrypted_data[offset:offset+4], byteorder='big')
+                chunk_length = int.from_bytes(data[offset:offset+4], byteorder='big')
                 offset += 4
                 
                 # Parçayı oku
-                if offset + chunk_length > len(encrypted_data):
+                if offset + chunk_length > len(data):
                     raise ValueError("Parçalı veri formatı bozuk: Eksik veri parçası.")
-                chunk = encrypted_data[offset:offset + chunk_length]
+                chunk = data[offset:offset + chunk_length]
                 offset += chunk_length
                 
                 # RSA ile deşifreleme

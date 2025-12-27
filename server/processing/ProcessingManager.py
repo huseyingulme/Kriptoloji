@@ -109,6 +109,14 @@ class ProcessingManager:
             from algorithms.RSAManual import RSAManual
             self.algorithms['rsa_manual'] = RSAManual()
 
+            # IDEA - International Data Encryption Algorithm (Kütüphaneli)
+            from algorithms.IDEACipher import IDEACipher
+            self.algorithms['idea'] = IDEACipher()
+
+            # IRON - International Data Encryption Algorithm (Feistel Variation)
+            from algorithms.IronCipher import IronCipher
+            self.algorithms['iron'] = IronCipher()
+
             Logger.info(f"{len(self.algorithms)} algoritma başarıyla kaydedildi", "ProcessingManager")
 
         except Exception as e:
@@ -177,6 +185,8 @@ class ProcessingManager:
                 actual_algorithm = 'des_lib' if use_library else 'des_manual'
             elif algorithm in ['rsa', 'rsa_manual']:
                 actual_algorithm = 'rsa_lib' if use_library else 'rsa_manual'
+            elif algorithm == 'iron':
+                actual_algorithm = 'iron'
             
             if actual_algorithm not in self.algorithms:
                 return {
@@ -230,9 +240,9 @@ class ProcessingManager:
                     if hasattr(cipher, '_last_generated_private_key') and cipher._last_generated_private_key:
                         import base64
                         private_key_b64 = base64.b64encode(cipher._last_generated_private_key).decode('utf-8')
-                        # Private key'i result_data'ya ekle (sadece metin modu için)
-                        result_str = result_data.decode('utf-8', errors='ignore') if isinstance(result_data, bytes) else str(result_data)
-                        result_data = f"RSA_PRIVATE_KEY:\n{private_key_b64}\n\nŞİFRELENMİŞ VERİ:\n{result_str}".encode('utf-8')
+                        # RSA için şifrelenmiş veriyi de Base64 yap ki metin olarak gösterilebilsin
+                        encrypted_b64 = base64.b64encode(result_data).decode('utf-8')
+                        result_data = f"RSA_PRIVATE_KEY:\n{private_key_b64}\n\nŞİFRELENMİŞ VERİ:\n{encrypted_b64}".encode('utf-8')
                 
                 # Performans loglama
                 advanced_logger.log_performance(f"encrypt_{algorithm}", duration, {"data_size": len(data)})
@@ -257,13 +267,26 @@ class ProcessingManager:
                         # 0. ETİKETLERİ TEMİZLE
                         lines = data_str.split('\n')
                         clean_lines = []
+                        is_private_key_section = False
                         for line in lines:
                             line_strip = line.strip()
                             if not line_strip: continue
+                            
+                            # RSA özel durum: Private key kısmını atla, sadece veriyi al
+                            if "RSA_PRIVATE_KEY:" in line_strip:
+                                is_private_key_section = True
+                                continue
+                            if "ŞİFRELENMİŞ VERİ:" in line_strip:
+                                is_private_key_section = False
+                                continue
+                            
+                            if is_private_key_section:
+                                continue
+
                             if any(tag in line_strip for tag in [
-                                "ŞİFRELENMİŞ VERİ:", "Şifrelenmiş Metin:", "Şifrelenmiş Veri (Hex):", 
+                                "Şifrelenmiş Metin:", "Şifrelenmiş Veri (Hex):", 
                                 "Hex Formatı:", "Base64 Formatı:", "Şifrelenmiş Veri (Base64):",
-                                "RSA_PRIVATE_KEY:", "⚠️ ÖNEMLİ:", "Boyut:", "Not:"
+                                "⚠️ ÖNEMLİ:", "Boyut:", "Not:"
                             ]):
                                 continue
                             clean_lines.append(line_strip)
