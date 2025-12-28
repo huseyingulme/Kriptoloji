@@ -2,9 +2,19 @@ from algorithms.BaseCipher import BaseCipher
 
 class VigenereCipher(BaseCipher):
     """
-    Vigenère Cipher
-    Çok alfabeli (polyalphabetic) klasik şifreleme algoritması.
-    Sadece alfabetik karakterleri şifreler.
+    🔐 [Algorithm Overview]
+    Type: Polyalphabetic Substitution Cipher
+    A method of encrypting alphabetic text by using a series of interwoven Caesar ciphers.
+
+    🔑 [Key Management]
+    - Uses a keyword that is repeated to match the plaintext length.
+    - Standard keys are managed through the system's Key Management module.
+
+    🧮 [Mathematical Foundation]
+    - Operates over the Finite Field GF(26).
+    - Encryption: Ci = (Pi + Ki) mod 26
+    - Decryption: Pi = (Ci - Ki) mod 26
+    - Each character represents an element in GF(26).
     """
 
     def __init__(self):

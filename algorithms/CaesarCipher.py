@@ -29,21 +29,8 @@ class CaesarCipher(BaseCipher):
         self.max_key_length = 3
         self.key_description = "1 ile 999 arasında kaydırma değeri"
 
-    # ------------------------------
-    #  🔐 ENCRYPT
-    # ------------------------------
+
     def encrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Veriyi Caesar algoritması ile şifreler.
-
-        Args:
-            data (bytes): Şifrelenecek ham veri
-            key (str): Kaydırma miktarı (string olarak)
-
-        Returns:
-            bytes: Şifrelenmiş veri
-        """
-
         shift = self._convert_key(key)
         result = bytearray()
 
@@ -63,21 +50,7 @@ class CaesarCipher(BaseCipher):
                 result.append(byte)
 
         return bytes(result)
-
-    # ------------------------------
-    #  🔓 DECRYPT
-    # ------------------------------
     def decrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Şifrelenmiş veriyi çözer (kaydırmanın tersi uygulanır).
-
-        Args:
-            data (bytes): Çözülecek veri
-            key (str): Kaydırma miktarı
-
-        Returns:
-            bytes: Çözülmüş veri
-        """
         if not data:
             return b""
 
@@ -103,32 +76,17 @@ class CaesarCipher(BaseCipher):
 
         return bytes(result)
 
-    # ------------------------------
-    #  🔑 KEY VALIDATION
-    # ------------------------------
-    def validate_key(self, key: str) -> bool:
-        """
-        Anahtarın geçerli olup olmadığını kontrol eder.
 
-        Returns:
-            bool: True → geçerli, False → geçersiz
-        """
+    def validate_key(self, key: str) -> bool:
+
         try:
             value = int(key)
             return 1 <= value <= 999
         except Exception:
             return False
 
-    # ------------------------------
-    #  🔧 INTERNAL HELPER
-    # ------------------------------
     def _convert_key(self, key: str) -> int:
-        """
-        Anahtarı güvenli bir şekilde integer'a çevirir ve mod 26 alır.
 
-        Raises:
-            ValueError: Key sayısal değilse veya geçersizse
-        """
 
         if not self.validate_key(key):
             raise ValueError("Anahtar geçersiz: 1–999 arasında bir sayı olmalı.")

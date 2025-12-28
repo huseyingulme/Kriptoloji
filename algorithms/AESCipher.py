@@ -96,7 +96,7 @@ class AESCipher(BaseCipher):
 
         if mode_name == 'ECB':
             if iv is not None or tag is not None:
-                 raise ValueError("ECB modu IV veya Tag kabul etmez.")
+                raise ValueError("ECB modu IV veya Tag kabul etmez.")
             return modes.ECB()
         
         # IV/Nonce gerektiren modlar için kontrol
@@ -185,7 +185,7 @@ class AESCipher(BaseCipher):
             elif mode_name == 'GCM':
                 iv_length = 12
                 if len(data) < iv_length + self.GCM_TAG_LENGTH:
-                     raise ValueError("GCM: Eksik IV/Nonce veya Tag.")
+                    raise ValueError("GCM: Eksik IV/Nonce veya Tag.")
                 iv = data[:iv_length]
                 tag = data[-self.GCM_TAG_LENGTH:]
                 encrypted_data = data[iv_length:-self.GCM_TAG_LENGTH]
@@ -230,14 +230,6 @@ class AESCipher(BaseCipher):
         except ValueError:
             return False
         except Exception:
-             # Diğer beklenmeyen hatalar için
-             return False
+            # Diğer beklenmeyen hatalar için
+            return False
 
-# Özet: AES şifreleme adımları (Kütüphane)
-# AES (Advanced Encryption Standard), bir Feistel ağı kullanmaz; bunun yerine bir Substitution-Permutation Network (SPN) kullanır.
-# 1. Tur Anahtarı Ekleme (AddRoundKey)
-# 2. 9/11/13 Normal Tur: Bayt Değiştirme (SubBytes) → Satır Kaydırma (ShiftRows) → Sütun Karıştırma (MixColumns) → Tur Anahtarı Ekleme (AddRoundKey)
-# 3. Son Tur: Bayt Değiştirme (SubBytes) → Satır Kaydırma (ShiftRows) → Tur Anahtarı Ekleme (AddRoundKey)
-
-# Not: Verilen kodda şifreleme ve çözme işlemleri sırasında kütüphanenin çağrılmasıyla bu adımlar
-# otomatik olarak gerçekleştirilir. Öğrencinin "Manuel Mod" için bu adımları kendisi kodlaması gerekecektir.

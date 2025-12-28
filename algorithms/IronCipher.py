@@ -5,6 +5,17 @@ from algorithms.BaseCipher import BaseCipher
 
 class IronCipher(BaseCipher):
     """
+    🔐 [Algorithm Overview]
+    Type: Feistel Block Cipher (Variation of IDEA)
+    A custom Feistel-based block cipher designed for academic exploration.
+
+    🔑 [Key Management]
+    - Key-dependent round counts and dynamic round keys.
+
+    🧮 [Mathematical Foundation]
+    - Uses a Feistel structure.
+    - Incorporates dynamic S-Box generation based on the key to frustrate linear cryptanalysis.
+    
     IRON (International Data Encryption Algorithm - Feistel Variation)
     
     Bu algoritma kullanıcı tarafından sağlanan özel Feistel mimarisine dayanmaktadır.

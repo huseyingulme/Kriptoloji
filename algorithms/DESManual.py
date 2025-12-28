@@ -5,13 +5,19 @@ from typing import List, Tuple
 
 class DESManual(BaseCipher):
     """
-    Manuel DES implementasyonu (kütüphanesiz).
-    
-    DES Özellikleri:
-    - Blok Boyutu: 64 bit (8 byte)
-    - Anahtar Boyutu: 64 bit (56 bit efektif)
-    - Tur Sayısı: 16 tur (Feistel Ağı)
-    - Mod: CBC (Cipher Block Chaining)
+    🔐 [Algorithm Overview]
+    Type: Symmetric Block Cipher (FIPS 46-3)
+    Mode: DES / CBC (Cipher Block Chaining)
+    Manual Implementation: All 16 rounds, S-Boxes, Permutations (IP, FP, E, P), 
+    and Key Schedule are implemented manually.
+
+    🔑 [Key Management]
+    - Uses a 56-bit effective key.
+    - Integrated with the centralized Security module for key distribution.
+
+    🧮 [Mathematical Foundation]
+    - Feistel Network structure.
+    - Uses non-linear substitution boxes (S-Boxes) and bit-level permutations.
     """
 
     block_size = 8

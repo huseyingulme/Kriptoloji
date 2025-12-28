@@ -16,7 +16,6 @@ from algorithms.DESCipher import DESCipher
 from algorithms.AESManual import AESManual
 from algorithms.DESManual import DESManual
 from algorithms.RSACipher import RSACipher
-from algorithms.KeyDistributionManager import KeyDistributionManager
 from shared.utils import Logger
 
 

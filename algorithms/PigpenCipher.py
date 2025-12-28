@@ -50,15 +50,9 @@ class PigpenCipher(BaseCipher):
             if letter == "J":
                 self.reverse_map[symbol] = "I"
 
-    # ------------------------------------------------
-    # Anahtar doğrulama (Pigpen anahtar istemez)
-    # ------------------------------------------------
     def validate_key(self, key: str) -> bool:
         return True
 
-    # ------------------------------------------------
-    # Şifreleme
-    # ------------------------------------------------
     def encrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = data.decode("utf-8", errors="ignore").upper()
@@ -77,9 +71,7 @@ class PigpenCipher(BaseCipher):
         except Exception as exc:
             raise Exception(f"Pigpen şifreleme hatası: {str(exc)}")
 
-    # ------------------------------------------------
-    # Çözme
-    # ------------------------------------------------
+
     def decrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = data.decode("utf-8", errors="ignore")

@@ -12,6 +12,7 @@ import time
 from typing import Dict, Any, Optional
 from shared.utils import Logger
 from shared.advanced_logger import advanced_logger
+from security.key_management import key_manager
 
 
 class ProcessingManager:
@@ -28,6 +29,7 @@ class ProcessingManager:
     def __init__(self):
         """ProcessingManager'ı başlatır ve algoritmaları kaydeder."""
         self.algorithms = {}  # Tüm algoritmalar burada saklanır
+        self.key_manager = key_manager
         self._register_algorithms()
 
     def _register_algorithms(self):

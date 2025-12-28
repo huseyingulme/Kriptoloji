@@ -28,9 +28,6 @@ class RouteCipher(BaseCipher):
             "Format: rows:cols:route → Örnek: 3:3:spiral | 4:4:column | 3:3:diagonal"
         )
 
-    # --------------------------------------------------
-    # KEY PARSER
-    # --------------------------------------------------
 
     def _parse_key(self, key: str):
         parts = key.split(":")
@@ -49,9 +46,6 @@ class RouteCipher(BaseCipher):
 
         return rows, cols, route
 
-    # --------------------------------------------------
-    # MATRIX HELPERS
-    # --------------------------------------------------
 
     def _fill_rowwise(self, text, rows, cols):
         matrix = [["" for _ in range(cols)] for _ in range(rows)]
@@ -66,9 +60,7 @@ class RouteCipher(BaseCipher):
     def _read_rowwise(self, matrix, rows, cols):
         return "".join(matrix[r][c] for r in range(rows) for c in range(cols))
 
-    # --------------------------------------------------
-    # SPIRAL ROUTE
-    # --------------------------------------------------
+
 
     def _read_spiral(self, matrix, rows, cols):
         res = []
@@ -127,9 +119,6 @@ class RouteCipher(BaseCipher):
 
         return matrix
 
-    # --------------------------------------------------
-    # COLUMN ROUTE
-    # --------------------------------------------------
 
     def _read_column(self, matrix, rows, cols):
         return "".join(matrix[r][c] for c in range(cols) for r in range(rows))
@@ -143,9 +132,6 @@ class RouteCipher(BaseCipher):
                 idx += 1
         return matrix
 
-    # --------------------------------------------------
-    # DIAGONAL ROUTE
-    # --------------------------------------------------
 
     def _read_diagonal(self, matrix, rows, cols):
         res = []
@@ -167,9 +153,7 @@ class RouteCipher(BaseCipher):
                     idx += 1
         return matrix
 
-    # --------------------------------------------------
-    # ENCRYPT
-    # --------------------------------------------------
+
 
     def encrypt(self, data: bytes, key: str) -> bytes:
         rows, cols, route = self._parse_key(key)
@@ -191,9 +175,7 @@ class RouteCipher(BaseCipher):
 
         return cipher.encode("utf-8")
 
-    # --------------------------------------------------
-    # DECRYPT
-    # --------------------------------------------------
+
 
     def decrypt(self, data: bytes, key: str) -> bytes:
         rows, cols, route = self._parse_key(key)

@@ -3,8 +3,17 @@ from algorithms.BaseCipher import BaseCipher
 
 class RailFenceCipher(BaseCipher):
     """
-    Rail Fence (Tren) Cipher
-    Yer değiştirme (transposition) tabanlı klasik şifreleme algoritması.
+    🔐 [Algorithm Overview]
+    Type: Transposition Cipher
+    A form of transposition cipher that derives its name from the way in which it is encoded.
+
+    🔑 [Key Management]
+    - The key is the number of "rails" (rows) used to write the message in a zigzag pattern.
+
+    🧮 [Mathematical Foundation]
+    - Unlike substitution ciphers, this is a transposition-based method.
+    - It does not rely on Finite Field (GF) arithmetic for its transformations.
+    - It rearranges the positions of characters according to a periodic geometric pattern.
     """
 
     def __init__(self):
@@ -17,9 +26,7 @@ class RailFenceCipher(BaseCipher):
         self.key_description = "Ray sayısı (örn: 3)"
         self.supports_binary = False
 
-    # ==================================================
-    # KEY
-    # ==================================================
+
 
     def validate_key(self, key: str) -> bool:
         try:
@@ -28,9 +35,6 @@ class RailFenceCipher(BaseCipher):
         except Exception:
             return False
 
-    # ==================================================
-    # ENCRYPT
-    # ==================================================
 
     def encrypt(self, data: bytes, key: str) -> bytes:
         rails = int(key)
@@ -53,9 +57,6 @@ class RailFenceCipher(BaseCipher):
         encrypted = "".join("".join(row) for row in fence)
         return encrypted.encode("utf-8")
 
-    # ==================================================
-    # DECRYPT
-    # ==================================================
 
     def decrypt(self, data: bytes, key: str) -> bytes:
         rails = int(key)

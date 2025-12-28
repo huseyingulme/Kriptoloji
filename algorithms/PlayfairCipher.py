@@ -15,17 +15,11 @@ class PlayfairCipher(BaseCipher):
         self.key_description = "Anahtar kelime (J harfi kullanılmaz, I ile birleştirilir)"
         self.alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
 
-    # ----------------------------------------------------------
-    # ---------------    TEXT PREPARE   ------------------------
-    # ----------------------------------------------------------
     def _clean_text(self, text: str) -> str:
         text = text.upper().replace("J", "I")
         text = re.sub(r'[^A-Z]', '', text)
         return text
 
-    # ----------------------------------------------------------
-    # ---------------    MATRIX CREATE   ------------------------
-    # ----------------------------------------------------------
     def _create_matrix(self, key: str) -> list:
         key = self._clean_text(key)
         if not key:
@@ -49,9 +43,7 @@ class PlayfairCipher(BaseCipher):
         # 5x5 matrise çevir
         return [matrix[i:i+5] for i in range(0, 25, 5)]
 
-    # ----------------------------------------------------------
-    # ---------------  PAIR GENERATION (ENCRYPT)  ---------------
-    # ----------------------------------------------------------
+
     def _prepare_pairs(self, text: str) -> list:
         pairs = []
         i = 0
@@ -75,9 +67,6 @@ class PlayfairCipher(BaseCipher):
 
         return pairs
 
-    # ----------------------------------------------------------
-    # ------- FIND POSITION in MATRIX --------------------------
-    # ----------------------------------------------------------
     def _find(self, ch: str, matrix: list):
         for i in range(5):
             for j in range(5):
@@ -85,9 +74,6 @@ class PlayfairCipher(BaseCipher):
                     return i, j
         return None
 
-    # ----------------------------------------------------------
-    # -------------------- ENCRYPT PAIR -------------------------
-    # ----------------------------------------------------------
     def _encrypt_pair(self, a: str, b: str, m: list) -> str:
         r1, c1 = self._find(a, m)
         r2, c2 = self._find(b, m)
@@ -101,9 +87,6 @@ class PlayfairCipher(BaseCipher):
         # rectangle rule
         return m[r1][c2] + m[r2][c1]
 
-    # ----------------------------------------------------------
-    # -------------------- DECRYPT PAIR -------------------------
-    # ----------------------------------------------------------
     def _decrypt_pair(self, a: str, b: str, m: list) -> str:
         r1, c1 = self._find(a, m)
         r2, c2 = self._find(b, m)
@@ -117,9 +100,6 @@ class PlayfairCipher(BaseCipher):
         # rectangle rule
         return m[r1][c2] + m[r2][c1]
 
-    # ----------------------------------------------------------
-    # ---------------------- ENCRYPT ----------------------------
-    # ----------------------------------------------------------
     def encrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = self._clean_text(data.decode("utf-8", errors="ignore"))
@@ -143,9 +123,6 @@ class PlayfairCipher(BaseCipher):
             Logger.error(f"Playfair hatası: {str(e)}", "PlayfairCipher")
             raise e
 
-    # ----------------------------------------------------------
-    # ---------------------- DECRYPT ----------------------------
-    # ----------------------------------------------------------
     def decrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = self._clean_text(data.decode("utf-8", errors="ignore"))
@@ -170,9 +147,6 @@ class PlayfairCipher(BaseCipher):
         except Exception as e:
             raise Exception(f"Playfair çözme hatası: {str(e)}")
 
-    # ----------------------------------------------------------
-    # ------------------ KEY VALIDATION -------------------------
-    # ----------------------------------------------------------
     def validate_key(self, key: str) -> bool:
         if not key:
             return False

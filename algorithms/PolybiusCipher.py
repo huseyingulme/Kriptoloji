@@ -25,17 +25,12 @@ class PolybiusCipher(BaseCipher):
 
         self.alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"  # J hariç
 
-    # ----------------------------------------------------------
-    # ---------------- TEXT CLEAN ------------------------------
-    # ----------------------------------------------------------
     def _clean_text(self, text: str) -> str:
         text = text.upper().replace("J", "I")
         text = re.sub(r"[^A-Z]", "", text)
         return text
 
-    # ----------------------------------------------------------
-    # ---------------- CREATE TABLE ----------------------------
-    # ----------------------------------------------------------
+
     def _create_table(self, key: str) -> list:
         if not key:
             return self.default_table
@@ -60,9 +55,6 @@ class PolybiusCipher(BaseCipher):
         # 5x5 tabloyu oluştur
         return [letters[i:i+5] for i in range(0, 25, 5)]
 
-    # ----------------------------------------------------------
-    # ---------------- FIND POSITION ---------------------------
-    # ----------------------------------------------------------
     def _find_position(self, char: str, table: list) -> tuple:
         for r in range(5):
             for c in range(5):
@@ -70,9 +62,6 @@ class PolybiusCipher(BaseCipher):
                     return r, c
         return None
 
-    # ----------------------------------------------------------
-    # -------------------- ENCRYPT -----------------------------
-    # ----------------------------------------------------------
     def encrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = self._clean_text(data.decode("utf-8", errors="ignore"))
@@ -96,9 +85,7 @@ class PolybiusCipher(BaseCipher):
         except Exception as e:
             raise Exception(f"Polybius şifreleme hatası: {str(e)}")
 
-    # ----------------------------------------------------------
-    # -------------------- DECRYPT -----------------------------
-    # ----------------------------------------------------------
+
     def decrypt(self, data: bytes, key: str) -> bytes:
         try:
             text = data.decode("utf-8", errors="ignore")
@@ -127,9 +114,6 @@ class PolybiusCipher(BaseCipher):
         except Exception as e:
             raise Exception(f"Polybius çözme hatası: {str(e)}")
 
-    # ----------------------------------------------------------
-    # ------------------ VALIDATE KEY --------------------------
-    # ----------------------------------------------------------
     def validate_key(self, key: str) -> bool:
         if not key:
             return True

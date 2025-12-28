@@ -30,10 +30,6 @@ class AffineCipher(BaseCipher):
         self.max_key_length = 10
         self.key_description = "Format: 'a,b' — a: 1–25, 26 ile aralarında asal; b: 0–25"
 
-    # --------------------------------------------------------------------
-    # 🔢 MATEMATİKSEL YARDIMCI FONKSİYONLAR
-    # --------------------------------------------------------------------
-
     def _gcd(self, a: int, b: int) -> int:
         """En büyük ortak bölen (Euclid)."""
         while b:
@@ -62,9 +58,7 @@ class AffineCipher(BaseCipher):
 
         return inv % m
 
-    # --------------------------------------------------------------------
-    # 🔑 ANAHTAR OKUMA
-    # --------------------------------------------------------------------
+
 
     def _parse_key(self, key: str) -> tuple[int, int]:
         """
@@ -97,9 +91,6 @@ class AffineCipher(BaseCipher):
 
         return a, b
 
-    # --------------------------------------------------------------------
-    # 🔤 HARF DÖNÜŞÜM FONKSİYONLARI
-    # --------------------------------------------------------------------
 
     def _encrypt_char(self, byte: int, a: int, b: int) -> int:
         """Tek bir karakteri şifreler."""
@@ -125,10 +116,6 @@ class AffineCipher(BaseCipher):
 
         return byte
 
-    # --------------------------------------------------------------------
-    # 🔐 ENCRYPT
-    # --------------------------------------------------------------------
-
     def encrypt(self, data: bytes, key: str) -> bytes:
         a, b = self._parse_key(key)
         result = bytearray()
@@ -137,10 +124,6 @@ class AffineCipher(BaseCipher):
             result.append(self._encrypt_char(byte, a, b))
 
         return bytes(result)
-
-    # --------------------------------------------------------------------
-    # 🔓 DECRYPT
-    # --------------------------------------------------------------------
 
     def decrypt(self, data: bytes, key: str) -> bytes:
         a, b = self._parse_key(key)
@@ -156,9 +139,6 @@ class AffineCipher(BaseCipher):
 
         return bytes(result)
 
-    # --------------------------------------------------------------------
-    # ✔ ANAHTAR DOĞRULAMA
-    # --------------------------------------------------------------------
 
     def validate_key(self, key: str) -> bool:
         try:

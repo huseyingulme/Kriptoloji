@@ -7,14 +7,9 @@ import os
 import hashlib
 import warnings
 
-# IDEA is deprecated in cryptography, so we suppress the warning if needed
-# but it's better to let the user know if they are looking at logs.
-# from cryptography.utils import CryptographyDeprecationWarning
-
 class IDEACipher(BaseCipher):
     """
-    International Data Encryption Algorithm (IDEA) Şifrelemesi (Kütüphaneli).
-    
+
     IDEA Özellikleri:
     - Blok Boyutu: 64 bit (8 byte)
     - Anahtar Boyutu: 128 bit (16 byte)

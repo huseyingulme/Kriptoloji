@@ -10,17 +10,6 @@ from abc import ABC, abstractmethod
 
 
 class BaseCipher(ABC):
-    """
-    Tüm şifreleme algoritmaları için temel soyut sınıf.
-
-    Ortak özellikler:
-    - Algoritma adı
-    - Açıklama
-    - Anahtar türü (“string”, “integer”, “matrix”, vb.)
-    - Binary veri desteği
-    - Minimum / maksimum anahtar uzunluğu
-    """
-
     def __init__(self):
         """Temel algoritma özelliklerini başlatır."""
         self.name: str = "BaseCipher"
@@ -30,7 +19,6 @@ class BaseCipher(ABC):
         self.min_key_length: int = 1
         self.max_key_length: int = 256
 
-    # ---------------------------------------------------------------------
 
     @abstractmethod
     def encrypt(self, data: bytes, key: str) -> bytes:
@@ -60,7 +48,6 @@ class BaseCipher(ABC):
         """
         raise NotImplementedError("decrypt() metodu implement edilmelidir.")
 
-    # ---------------------------------------------------------------------
 
     def validate_key(self, key: str) -> bool:
         """

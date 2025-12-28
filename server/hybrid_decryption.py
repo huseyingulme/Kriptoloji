@@ -15,7 +15,7 @@ from algorithms.DESCipher import DESCipher
 from algorithms.AESManual import AESManual
 from algorithms.DESManual import DESManual
 from algorithms.RSACipher import RSACipher
-from algorithms.KeyDistributionManager import KeyDistributionManager
+from security.key_management import key_manager
 from shared.utils import Logger
 
 
@@ -30,14 +30,11 @@ class HybridDecryptionManager:
     4. Düz metni döndürür
     """
 
-    def __init__(self, key_distribution_manager: KeyDistributionManager):
+    def __init__(self):
         """
         Hibrit çözme yöneticisini başlatır.
-        
-        Args:
-            key_distribution_manager: RSA anahtar yönetimi için
         """
-        self.key_manager = key_distribution_manager
+        self.key_manager = key_manager
         self.rsa_cipher = RSACipher()
         self.aes_cipher = AESCipher()
         self.des_cipher = DESCipher()
@@ -98,7 +95,7 @@ class HybridDecryptionManager:
             Logger.info(f"Hibrit paket parse edildi: {algorithm}", "HybridDecryptionManager")
 
             # 2. RSA ile simetrik anahtarı çözer
-            symmetric_key = self.key_manager.decrypt_symmetric_key(encrypted_key)
+            symmetric_key = self.key_manager.decrypt_received_key(encrypted_key)
             Logger.info(f"Simetrik anahtar çözüldü: {len(symmetric_key)} byte", "HybridDecryptionManager")
 
             # 3. Simetrik anahtar ile mesajı çözer

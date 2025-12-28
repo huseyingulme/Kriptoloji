@@ -20,12 +20,8 @@ class ColumnarTranspositionCipher(BaseCipher):
         self.max_key_length = 20
         self.key_description = "Anahtar kelime (sütun sırasını belirler)"
 
-    # ----------------------------------------------------------------------
 
     def encrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Columnar transposition ile şifreleme.
-        """
         try:
             key = key.strip().upper()
             if not self.validate_key(key):
@@ -60,12 +56,8 @@ class ColumnarTranspositionCipher(BaseCipher):
         except Exception as e:
             raise Exception(f"Şifreleme hatası: {str(e)}")
 
-    # ----------------------------------------------------------------------
 
     def decrypt(self, data: bytes, key: str) -> bytes:
-        """
-        Columnar transposition çözme işlemi.
-        """
         try:
             key = key.strip().upper()
             if not self.validate_key(key):
@@ -100,13 +92,9 @@ class ColumnarTranspositionCipher(BaseCipher):
         except Exception as e:
             raise Exception(f"Çözme hatası: {str(e)}")
 
-    # ----------------------------------------------------------------------
 
     def _get_key_order(self, key: str) -> list:
-        """
-        Anahtar kelimeyi alfabetik olarak sıralayıp,
-        harflerin gerçek pozisyonlarını döndürür.
-        """
+
         indexed_chars = list(enumerate(key))
         # Örn: "ZEBRA" → [(0,'Z'), (1,'E'), (2,'B'), ...]
 
@@ -116,15 +104,9 @@ class ColumnarTranspositionCipher(BaseCipher):
         # Yeni sıralamadaki sütun indexleri
         return [pair[0] for pair in sorted_chars]
 
-    # ----------------------------------------------------------------------
 
     def validate_key(self, key: str) -> bool:
-        """
-        Key doğrulama:
-        - boş olamaz
-        - sadece harflerden oluşabilir
-        - uzunluk sınırına uymalı
-        """
+
         if not key:
             return False
 

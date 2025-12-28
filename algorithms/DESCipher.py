@@ -32,7 +32,6 @@ class DESCipher(BaseCipher):
         self.key_description = "Anahtar formatı: 'key' veya 'mode:key' (örn: 'CBC:my_secret_key'). Modlar: ECB, CBC, CFB, OFB."
         self.supports_binary = True
 
-    # --- Yardımcı Metotlar ---
 
     def _parse_key_string(self, key_string: str) -> Tuple[str, str]:
         """Anahtar dizesini mod ve key string olarak ayrıştırır."""

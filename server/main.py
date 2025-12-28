@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.network.Server import Server
 from server.processing.ProcessingManager import ProcessingManager
-from algorithms.KeyDistributionManager import KeyDistributionManager
+from security.key_management import key_manager
 from shared.utils import Logger
 
 class ServerApplication:
@@ -26,7 +26,7 @@ class ServerApplication:
             Logger.info("Server uygulaması başlatılıyor...", "ServerApp")
 
             self.processing_manager = ProcessingManager()
-            self.key_manager = KeyDistributionManager()
+            self.key_manager = key_manager
 
             self.server = Server(self.host, self.port)
             self.server.set_processing_callback(self.processing_manager.process_request)
