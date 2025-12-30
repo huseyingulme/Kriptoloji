@@ -19,7 +19,7 @@ class AESCipher(BaseCipher):
     
     # Varsayılan ayarlar
     DEFAULT_KEY_SIZE = 256
-    DEFAULT_MODE = 'CBC'
+    DEFAULT_MODE = 'GCM'
     
     # GCM modu için zorunlu tag uzunluğu (Authentication Tag)
     GCM_TAG_LENGTH = 16 
