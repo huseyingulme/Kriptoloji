@@ -8,6 +8,7 @@ from cryptography.exceptions import InvalidTag
 import os
 import hashlib
 import base64
+from shared.utils import CryptoUtils
 
 class AESCipher(BaseCipher):
 
@@ -76,9 +77,21 @@ class AESCipher(BaseCipher):
         return (key_size, mode, key_str)
 
     def _derive_key(self, key_string: str, key_size: int) -> bytes:
-        """PBKDF2HMAC kullanarak kullanıcı anahtarından kriptografik anahtar türetir."""
+        """Kullanıcı anahtarından kriptografik anahtar türetir."""
+        if not key_string:
+            raise ValueError("Anahtar boş olamaz.")
+
+        # 1. Akıllı Anahtar Tespiti (Hex, B64, Raw)
+        # Bu, özellikle hibrit anahtarların manuel girilmesinde kritik öneme sahiptir.
+        derived_key = CryptoUtils.derive_key_robust(key_string, expected_sizes=[16, 24, 32])
+        
+        # Eğer zaten beklenen boyutlardaysa direkt döndür
+        if len(derived_key) in [16, 24, 32]:
+            return derived_key
+
+        # 2. Aksi takdirde PBKDF2HMAC kullanarak türet
         # Salt olarak anahtar stringinin SHA256 özetinin ilk 16 byte'ı kullanılır.
-        salt = hashlib.sha256(key_string.encode()).digest()[:16]
+        salt = hashlib.sha256(derived_key).digest()[:16]
 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -88,8 +101,8 @@ class AESCipher(BaseCipher):
             backend=default_backend()
         )
 
-        key = kdf.derive(key_string.encode())
-        return key
+        final_key = kdf.derive(derived_key)
+        return final_key
 
     def _get_mode_object(self, mode_name: str, iv: bytes = None, tag: bytes = None):
         """Mod objesini döndürür, ECB için IV/Nonce istemez."""
@@ -127,6 +140,12 @@ class AESCipher(BaseCipher):
         try:
             key_size, mode_name, key_string = self._parse_key_string(key)
             aes_key = self._derive_key(key_string, key_size)
+
+            # Anahtar boyutu kontrolü ve düzeltmesi (Manuel girilen raw keyler için)
+            actual_key_size = len(aes_key) * 8
+            if actual_key_size in self.SUPPORTED_KEY_SIZES and actual_key_size != key_size:
+                key_size = actual_key_size
+
             algorithm = self._get_aes_algorithm(aes_key, key_size)
             
             # 1. IV/Nonce Üretimi (ECB hariç)
@@ -173,6 +192,12 @@ class AESCipher(BaseCipher):
         try:
             key_size, mode_name, key_string = self._parse_key_string(key)
             aes_key = self._derive_key(key_string, key_size)
+
+            # Anahtar boyutu kontrolü ve düzeltmesi (Manuel girilen raw keyler için)
+            actual_key_size = len(aes_key) * 8
+            if actual_key_size in self.SUPPORTED_KEY_SIZES and actual_key_size != key_size:
+                key_size = actual_key_size
+
             algorithm = self._get_aes_algorithm(aes_key, key_size)
             
             iv = None

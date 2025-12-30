@@ -1,3 +1,8 @@
+"""
+Logger sınıfı, gelişmiş bir loglama sistemi bulunmadığı durumlarda uygulamanın
+çalışmaya devam etmesini sağlayan basit bir yedek (fallback) loglama mekanizmasıdır.
+Hata, bilgi ve uyarı mesajlarının güvenli şekilde kaydedilmesini sağlar.
+"""
 import os
 import logging
 import logging.handlers

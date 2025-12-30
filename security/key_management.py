@@ -21,6 +21,7 @@ class KeyManagement:
     def __init__(self):
         self.rsa_cipher = RSACipher()
         self._server_key_pair: Optional[Tuple[bytes, bytes]] = None
+        self._server_ecc_key_pair: Optional[Tuple[bytes, bytes]] = None
         self._ensure_server_keys()
 
     def _ensure_server_keys(self):
@@ -75,9 +76,31 @@ class KeyManagement:
             
         return self.rsa_cipher.decrypt_symmetric_key(encrypted_key_b64, private_key_pem)
 
-    def get_public_key(self) -> bytes:
-        """Sunucu public key'ini döndürür."""
+    def get_server_public_key(self) -> bytes:
+        """Sunucu RSA public key'ini döndürür."""
         return self._server_key_pair[1]
+
+    def get_server_private_key(self) -> bytes:
+        """Sunucu RSA private key'ini döndürür (Admin panel için)."""
+        return self._server_key_pair[0]
+
+    # --- ECC Support (Added for modern key agreement) ---
+
+    def generate_ecc_key_pair(self) -> Tuple[bytes, bytes]:
+        """ECC (ECDH) anahtar çifti oluşturur (Persist eder)."""
+        if self._server_ecc_key_pair:
+            return self._server_ecc_key_pair
+            
+        from algorithms.ECCCipher import ECCCipher
+        ecc = ECCCipher()
+        self._server_ecc_key_pair = ecc.generate_key_pair()
+        return self._server_ecc_key_pair
+
+    def derive_shared_secret(self, private_pem: bytes, peer_public_pem: bytes) -> bytes:
+        """ECDH ile ortak gizli anahtar türetir."""
+        from algorithms.ECCCipher import ECCCipher
+        ecc = ECCCipher()
+        return ecc.get_shared_secret(private_pem, peer_public_pem)
 
 # Global instance for easy access
 key_manager = KeyManagement()

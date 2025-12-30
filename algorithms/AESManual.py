@@ -4,28 +4,23 @@ import hashlib
 from typing import List, Tuple
 from algorithms.aes_manual import gf
 from algorithms.aes_manual import sbox
+from shared.utils import CryptoUtils
 
 class AESManual(BaseCipher):
     """
     🔐 [Algorithm Overview]
-    Type: Symmetric Block Cipher (FIPS 197)
-    Mode: AES-256 / CBC (Cipher Block Chaining)
-    Manual Implementation: All core steps (SubBytes, ShiftRows, MixColumns, AddRoundKey) 
-    and Key Expansion are implemented without external cryptographic libraries.
-
-    🔑 [Key Management]
-    - Session keys are derived using SHA-256 from the input key string.
-    - Key distribution is handled centrally by the Security/Key Management module.
-    - Supports dynamic S-Box generation tied to the encryption key for enhanced security.
+    Type: Symmetric Block Cipher (Manual implementation)
+    Mode: AES-256 / CBC
+    
+    🔒 KRİPTO FELSEFESİ:
+    "AES bir ezber tablo değil, bir matematiksel dönüşümdür."
+    - SubBytes adımı: Sabit S-Box yerine GF(2^8) multiplicative inverse kullanılır.
+    - Tüm seans anahtarları random üretilir ve sadece RAM'de tutulur.
 
     🧮 [Mathematical Foundation]
-    - Operations are performed in the Galois Field GF(2^8).
+    - Operations in Galois Field GF(2^8).
     - Polynomial: P(x) = x^8 + x^4 + x^3 + x + 1 (0x11B).
-    - MixColumns uses GF(2^8) multiplication.
-    - S-Box is generated via multiplicative inverse in GF(2^8) followed by an affine transformation.
     """
-
-    block_size = 16  # 128 bit
 
     # --- AES Sabitleri (Constants) ---
     _R_CON = [
@@ -42,6 +37,7 @@ class AESManual(BaseCipher):
         self.max_key_length = 200
         self.key_description = "Anahtar (Dinamik S-Box ve Round Key üretimi için kullanılır)"
         self.supports_binary = True
+        self.block_size = 16
         
         # S-Box'lar her seferinde anahtara göre üretilecek fakat 
         # varsayılan olarak standart S-Box yüklenebilir.
@@ -55,10 +51,19 @@ class AESManual(BaseCipher):
 
     @staticmethod
     def _derive_key(key: str, key_size: int = 32) -> bytes:
-        """SHA-256 ile anahtarı istenen boyuta türetir."""
+        """Kullanıcı anahtarından kriptografik anahtar türetir."""
         if not key:
             raise ValueError("AES için anahtar dizesi gerekli")
-        digest = hashlib.sha256(key.encode('utf-8')).digest()
+            
+        # 1. Akıllı Anahtar Tespiti (Hex, B64, Raw)
+        derived_key = CryptoUtils.derive_key_robust(key, expected_sizes=[16, 24, 32])
+        
+        # Eğer zaten beklenen boyutlardaysa direkt döndür
+        if len(derived_key) in [16, 24, 32]:
+            return derived_key
+
+        # 2. Aksi takdirde SHA256 ile türet
+        digest = hashlib.sha256(derived_key).digest()
         return digest[:key_size]
 
     # --- AES Tur Adımları (Round Operations) ---

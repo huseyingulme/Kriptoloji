@@ -1,8 +1,11 @@
 """
-AES Dynamic S-Box Generation
+AES S-Box Mathematical Generation (Galois Field Foundations)
 
-Bu modül, statik bir tablo yerine anahtara bağlı veya standart AES 
-S-Box'ını matematiksel olarak üreten mantığı içerir.
+Bu modül, S-Box değerlerini statik bir tablo yerine matematiksel 
+temellerle (GF(2^8)) üretir.
+
+KRİPTO FELSEFESİ:
+"AES bir ezber tablo değil, bir matematiksel dönüşümdür."
 """
 
 from algorithms.aes_manual import gf
@@ -11,16 +14,15 @@ def generate_sbox() -> list:
     """
     Standart AES S-Box'ını matematiksel olarak üretir.
     Adımlar:
-    1. 0'dan 255'e kadar her sayı için GF(2^8) tersini bul.
-    2. Affine dönüşümü uygula.
+    1. GF(2^8) üzerinde çarpımsal tersini bul (Multiplicative Inverse).
+    2. Afin Dönüşümü uygula (Affine Transformation).
     """
     sbox = [0] * 256
     for i in range(256):
-        # 1. Çarpımsal ters
+        # 1. Adım: GF(2^8) tersini bul
         inv = gf.inverse(i)
         
-        # 2. Affine Dönüşümü: s = b + (b << 1) + (b << 2) + (b << 3) + (b << 4) + 0x63
-        # Bu işlem bit bazlı bir matris çarpımı + sabit XOR'dur.
+        # 2. Adım: Affine Dönüşümü (Bit bazlı matris çarpımı + 0x63 Sabiti)
         s = inv
         x = inv
         for _ in range(4):
@@ -30,8 +32,11 @@ def generate_sbox() -> list:
         
     return sbox
 
-def generate_inverse_sbox(sbox: list) -> list:
-    """Verilen bir S-Box'ın tersini üretir."""
+def generate_inverse_sbox(sbox: list = None) -> list:
+    """S-Box'ın tersini (Decryption için) üretir."""
+    if sbox is None:
+        sbox = generate_sbox()
+        
     inv_sbox = [0] * 256
     for i in range(256):
         inv_sbox[sbox[i]] = i
@@ -40,11 +45,8 @@ def generate_inverse_sbox(sbox: list) -> list:
 def generate_dynamic_sbox(seed_key: bytes) -> list:
     """
     Anahtara bağlı dinamik S-Box üretir.
-    NOT: Akademik olarak "Dinamik S-Box" kullanımı, şifreleme gücünü 
-    lineer kriptanalize karşı değiştirebilir.
+    Akademik Amaç: Standart S-Box'ın anahtar bağımlı permutasyonu.
     """
-    # Basit bir örnek: Standart S-Box'ı anahtarın XOR toplamı kadar döndür
     base_sbox = generate_sbox()
     shift = sum(seed_key) % 256
-    dynamic_sbox = base_sbox[shift:] + base_sbox[:shift]
-    return dynamic_sbox
+    return base_sbox[shift:] + base_sbox[:shift]

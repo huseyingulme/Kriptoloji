@@ -2,24 +2,19 @@ from algorithms.BaseCipher import BaseCipher
 import os
 import hashlib
 from typing import List, Tuple
+from shared.utils import CryptoUtils
 
 class DESManual(BaseCipher):
     """
     🔐 [Algorithm Overview]
-    Type: Symmetric Block Cipher (FIPS 46-3)
-    Mode: DES / CBC (Cipher Block Chaining)
-    Manual Implementation: All 16 rounds, S-Boxes, Permutations (IP, FP, E, P), 
-    and Key Schedule are implemented manually.
+    Type: Symmetric Block Cipher (Manual academic implementation)
+    Mode: DES / CBC
 
-    🔑 [Key Management]
-    - Uses a 56-bit effective key.
-    - Integrated with the centralized Security module for key distribution.
-
-    🧮 [Mathematical Foundation]
-    - Feistel Network structure.
-    - Uses non-linear substitution boxes (S-Boxes) and bit-level permutations.
+    🔒 KRİPTO FELSEFESİ:
+    "DES, modern tehditlere karşı zayıflığını akademik olarak analiz etmek için sunulmuştur."
+    - Kısa anahtar (56-bit) ve zayıf S-Box yapısı gösterilmiştir.
+    - Hibrit yapıda RSA ile anahtar dağıtımı yapılır ancak çekirdek zayıftır.
     """
-
     block_size = 8
 
     # --- DES Sabit Tabloları ---
@@ -123,10 +118,19 @@ class DESManual(BaseCipher):
 
     @staticmethod
     def _derive_key(key: str) -> bytes:
-        """MD5 kullanarak anahtarı 8 byte'a türetir."""
+        """Kullanılan anahtarı 8 byte'a türetir."""
         if not key:
             raise ValueError("DES için anahtar gerekli")
-        digest = hashlib.md5(key.encode('utf-8')).digest()
+        
+        # 1. Akıllı Anahtar Tespiti (Hex, B64, Raw)
+        derived_key = CryptoUtils.derive_key_robust(key, expected_sizes=[8])
+        
+        # Eğer zaten 8 byte ise direkt kullan
+        if len(derived_key) == 8:
+            return derived_key
+
+        # 2. Aksi takdirde MD5 kullanarak anahtarı 8 byte'a türetir.
+        digest = hashlib.md5(derived_key).digest()
         return digest[:8]
 
     @staticmethod

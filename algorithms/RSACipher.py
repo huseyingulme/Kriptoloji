@@ -1,10 +1,3 @@
-"""
-RSA Cipher - Asimetrik Şifreleme Algoritması
-
-Bu implementasyonda RSA, simetrik şifreleme yerine anahtar dağıtımı 
-amacıyla kullanılmaktadır (Hibrit Şifreleme).
-"""
-
 from algorithms.BaseCipher import BaseCipher
 from typing import Tuple, Optional
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -12,11 +5,18 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 import base64
 
-
 class RSACipher(BaseCipher):
     """
-    RSA şifreleme algoritması (Public Key ile şifreleme, Private Key ile çözme).
-    Kullanım amacı: Oturum (Session) anahtarlarını güvenli iletmek (Anahtar Dağıtımı).
+    🔐 [Algorithm Overview]
+    Type: Asymmetric Cipher (RSA)
+    Primary Use: KEY ENCRYPTION / DISTRIBUTION (Not for direct message text)
+
+    🔒 KRİPTO FELSEFESİ:
+    "Asimetrik algoritmalar (RSA) veri şifrelemez, sadece anahtar şifreler."
+    - Yavaşlık ve blok yapısı nedeniyle büyük veriler için uygun değildir.
+    - Metin şifrelemek verimsizdir.
+    - Bu projede simetrik seans anahtarlarını (AES/DES) güvenli dağıtmak için kullanılır.
+    - RSA = Anahtar Koruma Aracı.
     """
 
     DEFAULT_KEY_SIZE = 2048  # RSA anahtar boyutu (bit)
@@ -102,16 +102,29 @@ class RSACipher(BaseCipher):
     def encrypt(self, data: bytes, key: str) -> bytes:
         """
         Veriyi RSA ile şifreler (Public Key gereklidir).
-        Args: data: Şifrelenecek veri. key: RSA public key (PEM string/bytes) veya 'pub:priv' string.
-        Returns: bytes: Şifrelenmiş veri (base64 encoded).
+        
+        ⚠️ ÖNEMLİ: RSA ile doğrudan büyük veri/metin şifrelemek verimsizdir.
+        Bu metodun anahtar (seans anahtarı) taşıma için kullanılması önerilir.
         """
+        if len(data) > 512:
+            Logger.warning(f"RSA ile büyük veri ({len(data)} byte) şifreleniyor. Bu işlem yavaştır. Hibrit yöntemi (AES+RSA) önerilir.", "RSACipher")
+        
         try:
             # Public key'i ayır (key string'i "pub:priv" formatında gelebilir veya "generate" olabilir)
             public_pem = None
             if ':' in key or key.lower() == 'generate' or not key:
                 public_pem, _, _ = self._parse_key_string(key)
             else:
-                public_pem = key.encode() if isinstance(key, str) and not key.startswith('-----') else key.encode() if isinstance(key, str) else key
+                # Base64 PEM desteği (GUI'den gelirse)
+                key_bytes = key.encode() if isinstance(key, str) else key
+                if not key_bytes.startswith(b'-----'):
+                    try:
+                        decoded = base64.b64decode(key_bytes)
+                        if decoded.startswith(b'-----'):
+                            key_bytes = decoded
+                    except:
+                        pass
+                public_pem = key_bytes
             
             public_key = serialization.load_pem_public_key(public_pem, backend=default_backend())
             
@@ -166,7 +179,16 @@ class RSACipher(BaseCipher):
             if ':' in key or key.lower() == 'generate' or not key:
                 _, private_pem, _ = self._parse_key_string(key)
             else:
-                private_pem = key.encode() if isinstance(key, str) else key
+                # Base64 PEM desteği (GUI'den gelirse)
+                key_bytes = key.encode() if isinstance(key, str) else key
+                if not key_bytes.startswith(b'-----'):
+                    try:
+                        decoded = base64.b64decode(key_bytes)
+                        if decoded.startswith(b'-----'):
+                            key_bytes = decoded
+                    except:
+                        pass
+                private_pem = key_bytes
             
             private_key = serialization.load_pem_private_key(
                 private_pem,

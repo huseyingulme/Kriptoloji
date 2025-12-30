@@ -19,19 +19,20 @@ class ServerWindow:
     def __init__(self, host="localhost", port=12345):
         self.root = tk.Tk()
         self.root.title("Kriptoloji Server - Şifreleme Sunucusu")
-        self.root.geometry("800x600")
+        self.root.geometry("900x1000")
         self.root.resizable(True, True)
 
         self.host = host
         self.port = port
         self.server = None
         self.processing_manager = None
-        self.key_manager = None
+        self.key_manager = key_manager
         self.running = False
         self.client_count = 0
         self.request_count = 0
         self.decrypted_file_data = None  # Deşifrelenmiş dosya verisi
         self.decrypted_filename = None  # Deşifrelenmiş dosya adı
+        self.last_hybrid_data = None  # Son gelen hibrit paketi saklamak için (Manuel akış)
 
         self._create_widgets()
         self._setup_logging()
@@ -144,6 +145,11 @@ class ServerWindow:
         self.proc_output_text = scrolledtext.ScrolledText(process_frame, height=4, width=50, state="disabled", font=("Consolas", 11, "bold"), background="#f0fff0")
         self.proc_output_text.grid(row=6, column=0, columnspan=4, sticky=(tk.W, tk.E))
 
+        # Hibrit Manuel İşlem Butonu (Sadece hibrit paket geldiğinde aktif olur)
+        self.hybrid_transfer_btn = ttk.Button(process_frame, text="🧪 Anahtarı Çöz", 
+                                             command=self._transfer_to_manual, state="disabled")
+        self.hybrid_transfer_btn.grid(row=7, column=0, columnspan=4, pady=(5, 0))
+
         # 3. ALT PANEL: Manuel İşlem Araçları
         manual_frame = ttk.LabelFrame(main_frame, text="🛠️ Manuel İşlem Araçları", padding="10")
         manual_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -161,13 +167,28 @@ class ServerWindow:
         # Algoritma & Key (Metin için)
         ttk.Label(text_tab, text="Algoritma:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         self.man_algo_var = tk.StringVar(value="caesar")
-        algos = ["caesar", "vigenere", "affine", "hill", "playfair", "railfence", "columnar", "polybius", "substitution", "route", "pigpen", "aes", "des", "idea", "iron", "aes_manual", "des_manual", "rsa", "rsa_manual"]
+        algos = [
+            "caesar", "vigenere", "affine", "hill", "playfair", "railfence", "columnar", "polybius", 
+            "substitution", "route", "pigpen",
+            # Modern Simetrik Şifreleme (Kütüphaneli)
+            "aes", "des", "idea", "iron",
+            # Modern Simetrik Şifreleme (Manuel)
+            "aes_manual", "des_manual",
+            # Asimetrik & Hibrit Şifreleme
+            "rsa", "rsa_manual",
+            "hybrid_aes", "hybrid_aes_manual", "hybrid_des", "hybrid_des_manual",
+            "hybrid_ecc_aes", "hybrid_ecc_aes_manual", "hybrid_ecc_des", "hybrid_ecc_des_manual"
+        ]
         self.man_algo_combo = ttk.Combobox(text_tab, textvariable=self.man_algo_var, values=algos, state="readonly")
         self.man_algo_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
 
         ttk.Label(text_tab, text="Anahtar:").grid(row=0, column=2, sticky=tk.W, padx=(10, 5))
         self.man_key_var = tk.StringVar()
         ttk.Entry(text_tab, textvariable=self.man_key_var, width=20).grid(row=0, column=3, sticky=(tk.W, tk.E))
+        
+        # Sunucu anahtarını getirme butonu
+        ttk.Button(text_tab, text="🔑 Sunucu Anahtarını Getir", 
+                   command=self._fetch_server_private_key).grid(row=0, column=4, padx=5)
 
         # Manuel Giriş (Metin)
         ttk.Label(text_tab, text="Giriş Verisi:").grid(row=1, column=0, sticky=tk.W, pady=(10, 0))
@@ -175,7 +196,13 @@ class ServerWindow:
         self.man_input_text.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
 
         # Manuel Çıkış (Metin)
-        ttk.Label(text_tab, text="Sonuç:").grid(row=1, column=2, sticky=tk.W, pady=(10, 0), padx=(10, 0))
+        out_lbl_frame = ttk.Frame(text_tab)
+        out_lbl_frame.grid(row=1, column=2, sticky=(tk.W, tk.E), pady=(10, 0), padx=(10, 0))
+        
+        ttk.Label(out_lbl_frame, text="Sonuç:").pack(side=tk.LEFT)
+        ttk.Button(out_lbl_frame, text="📋 Kopyala", width=10,
+                   command=lambda: self._copy_to_clipboard(self.man_output_text.get("1.0", tk.END).strip())).pack(side=tk.RIGHT)
+
         self.man_output_text = scrolledtext.ScrolledText(text_tab, height=4, width=30)
         self.man_output_text.grid(row=2, column=2, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10), padx=(10, 0))
 
@@ -225,8 +252,14 @@ class ServerWindow:
         ttk.Button(file_btn_frame, text="🧹 Temizle", command=self._clear_server_file).pack(side=tk.LEFT, padx=5)
 
         # Sonuç Bilgisi
+        res_lbl_frame = ttk.Frame(file_tab)
+        res_lbl_frame.grid(row=4, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(10, 0))
+        ttk.Label(res_lbl_frame, text="Deşifreleme Sonucu:").pack(side=tk.LEFT)
+        ttk.Button(res_lbl_frame, text="📋 Kopyala", width=10,
+                   command=lambda: self._copy_to_clipboard(self.server_file_result_text.get("1.0", tk.END).strip())).pack(side=tk.RIGHT)
+
         self.server_file_result_text = tk.Text(file_tab, height=4, state=tk.DISABLED, font=("Consolas", 9))
-        self.server_file_result_text.grid(row=4, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(10, 0))
+        self.server_file_result_text.grid(row=5, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 10))
 
         # 4. KONTROL & LOG
         bottom_frame = ttk.Frame(main_frame)
@@ -264,12 +297,52 @@ class ServerWindow:
             messagebox.showwarning("Uyarı", "Giriş verisi boş olamaz!")
             return
             
-        if self.server and self.server.processing_callback:
+        if not (self.server and self.server.processing_callback):
+            messagebox.showerror("Hata", "ProcessingManager hazır değil!")
+            return
+
+        # İşlem butonunu devre dışı bırak
+        # Not: Buton referansı _create_widgets içinde yerel kalmış olabilir, 
+        # bu yüzden try-except kullanıyoruz veya butonu buluyoruz.
+        # En güvenlisi log mesajı ile kullanıcıya bildirmek.
+        
+        def process_thread():
             try:
+                self.root.after(0, lambda: self._log_message(f"🔄 Manuel işlem başlatılıyor: {algo} ({op_type})...", "INFO"))
+                
                 # String veriyi bytes'a çevir
                 data_bytes = input_data.encode('utf-8')
                 
-                # İşlemi yap
+                # Hibrit şifreleme kontrolü (Veya otomatik JSON tespiti)
+                is_hybrid_data = False
+                try:
+                    if data_bytes.strip().startswith(b'{'):
+                        import json
+                        temp_json = json.loads(data_bytes.decode('utf-8'))
+                        if temp_json.get('type') == 'HYBRID_ENCRYPT':
+                            is_hybrid_data = True
+                except:
+                    pass
+
+                if algo.startswith("hybrid_") or is_hybrid_data:
+                    if op_type == "DECRYPT":
+                        if not self.server.hybrid_decryption_manager:
+                            self.root.after(0, lambda: messagebox.showerror("Hata", "Hibrit deşifreleme yöneticisi bulunamadı!"))
+                            return
+                        
+                        if is_hybrid_data and not algo.startswith("hybrid_"):
+                            self.root.after(0, lambda: self._log_message("🔍 Otomatik hibrit paket tespiti yapıldı.", "INFO"))
+                            
+                        # Hibrit paketi çöz (JSON formatında olmalı)
+                        result_data = self.server.hybrid_decryption_manager.decrypt_message(data_bytes)
+                        res_str = result_data.decode('utf-8', errors='ignore')
+                        
+                        self.root.after(0, lambda: self._update_manual_ui(res_str, f"🛠️ Manuel Hibrit deşifreleme başarılı."))
+                    else:
+                        self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Manuel hibrit şifreleme server GUI'de desteklenmez. Lütfen client kullanın."))
+                    return
+
+                # Normal işlem
                 result = self.server.processing_callback(data_bytes, op_type, algo, key, {})
                 
                 if result and result.get('success'):
@@ -277,18 +350,30 @@ class ServerWindow:
                     try:
                         res_str = res_data.decode('utf-8')
                     except:
-                        res_str = res_data.hex()
+                        res_str = base64.b64encode(res_data).decode('utf-8')
                         
-                    self.man_output_text.delete("1.0", tk.END)
-                    self.man_output_text.insert(tk.END, res_str)
-                    self._log_message(f"🛠️ Manuel işlem başarılı: {algo} ({op_type})", "SUCCESS")
+                    self.root.after(0, lambda: self._update_manual_ui(res_str, f"🛠️ Manuel işlem başarılı: {algo} ({op_type})"))
                 else:
                     err = result.get('error', 'Bilinmeyen hata')
-                    messagebox.showerror("Hata", f"İşlem başarısız: {err}")
+                    self.root.after(0, lambda: messagebox.showerror("Hata", f"İşlem başarısız: {err}"))
             except Exception as e:
-                messagebox.showerror("Hata", f"Sistemsel hata: {str(e)}")
-        else:
-            messagebox.showerror("Hata", "ProcessingManager hazır değil!")
+                self.root.after(0, lambda: messagebox.showerror("Hata", f"Sistemsel hata: {str(e)}"))
+
+        # Thread'i başlat
+        threading.Thread(target=process_thread, daemon=True).start()
+
+    def _update_manual_ui(self, result_text, success_message):
+        """Manuel işlem sonucunu UI'da günceller."""
+        self.man_output_text.delete("1.0", tk.END)
+        
+        # Büyük veri kontrolü (Performans için)
+        display_text = result_text
+        if len(display_text) > 10000:
+            display_text = display_text[:9997] + "..."
+            self._log_message("⚠️ Sonuç çok büyük olduğu için sadece ilk 10.000 karakter gösteriliyor.", "WARNING")
+            
+        self.man_output_text.insert(tk.END, display_text)
+        self._log_message(success_message, "SUCCESS")
 
     def _clear_manual(self):
         """Manuel sekmesini temizler."""
@@ -358,42 +443,86 @@ class ServerWindow:
                     'file_size': len(encrypted_data)
                 }
 
-                # Deşifreleme işlemi
-                result = self.server.processing_callback(
-                    encrypted_data, 
-                    'DECRYPT', 
-                    algorithm, 
-                    key, 
-                    metadata
-                )
+                # Hibrit şifreleme kontrolü (Veya otomatik JSON tespiti)
+                is_hybrid_data = False
+                try:
+                    if encrypted_data.strip().startswith(b'{'):
+                        import json
+                        temp_json = json.loads(encrypted_data.decode('utf-8'))
+                        if temp_json.get('type') == 'HYBRID_ENCRYPT':
+                            is_hybrid_data = True
+                except:
+                    pass
 
-                if result and result.get('success'):
-                    self.decrypted_file_data = result['data']
+                if algorithm.startswith("hybrid_") or is_hybrid_data:
+                    if not self.server.hybrid_decryption_manager:
+                        self.root.after(0, lambda: messagebox.showerror("Hata", "Hibrit deşifreleme yöneticisi bulunamadı!"))
+                        return
+                    
+                    if is_hybrid_data and not algorithm.startswith("hybrid_"):
+                        self.root.after(0, lambda: self._log_message("🔍 Otomatik hibrit paket tespiti yapıldı (Dosya).", "INFO"))
+
+                    # Hibrit paketi çöz (JSON formatında olmalı)
+                    self.decrypted_file_data = self.server.hybrid_decryption_manager.decrypt_message(encrypted_data)
                     original_filename = os.path.basename(file_path)
                     if original_filename.endswith('.enc'):
-                        self.decrypted_filename = original_filename[:-4]  # .enc'i kaldır
+                        self.decrypted_filename = original_filename[:-4]
                     else:
-                        self.decrypted_filename = original_filename
+                        self.decrypted_filename = "decrypted_" + original_filename
                     
-                    result_info = f"✅ Deşifreleme başarılı!\n\n"
-                    result_info += f"📁 Şifreli Dosya: {original_filename}\n"
-                    result_info += f"📁 Çözülmüş Dosya: {self.decrypted_filename}\n"
-                    result_info += f"🔐 Algoritma: {algorithm}\n"
-                    result_info += f"🔑 Anahtar: {key}\n"
-                    result_info += f"📊 Şifreli Boyut: {len(encrypted_data):,} bytes\n"
+                    result_info = f"✅ Manuel Hibrit Deşifreleme başarılı!\n\n"
+                    if is_hybrid_data and not algorithm.startswith("hybrid_"):
+                        result_info = "🔍 (OTOMATİK TESPİT) " + result_info
+                        
+                    result_info += f"📁 Dosya: {original_filename}\n"
+                    # Eğer otomatik tespit edildiyse gerçek algoritmayı paketten alıp göstersek iyi olur ama parse_hybrid_packet lazım
+                    try:
+                        import json
+                        packet_info = json.loads(encrypted_data.decode('utf-8'))
+                        actual_algo = packet_info.get('algorithm', algorithm)
+                        result_info += f"🔐 Algoritma: {actual_algo} (Hibrit)\n"
+                    except:
+                        result_info += f"🔐 Algoritma: {algorithm}\n"
+                        
                     result_info += f"📊 Orijinal Boyut: {len(self.decrypted_file_data):,} bytes\n\n"
                     result_info += f"💾 Dosyayı kaydetmek için 'Sonucu Kaydet' butonuna tıklayın."
-                    
-                    self.root.after(0, lambda: self._update_server_file_result(result_info))
-                    self.root.after(0, lambda: self._log_message(f"✅ Dosya deşifrelendi: {original_filename} → {self.decrypted_filename}", "SUCCESS"))
                 else:
-                    error_msg = result.get('error', 'Bilinmeyen hata') if result else 'İşlem başarısız'
-                    self.root.after(0, lambda: messagebox.showerror("Hata", f"Deşifreleme başarısız: {error_msg}"))
-                    self.root.after(0, lambda: self._log_message(f"❌ Dosya deşifreleme hatası: {error_msg}", "ERROR"))
+                    # Normal deşifreleme işlemi
+                    result = self.server.processing_callback(
+                        encrypted_data, 
+                        'DECRYPT', 
+                        algorithm, 
+                        key, 
+                        metadata
+                    )
+
+                    if result and result.get('success'):
+                        self.decrypted_file_data = result['data']
+                        original_filename = os.path.basename(file_path)
+                        if original_filename.endswith('.enc'):
+                            self.decrypted_filename = original_filename[:-4]  # .enc'i kaldır
+                        else:
+                            self.decrypted_filename = original_filename
+                        
+                        result_info = f"✅ Deşifreleme başarılı!\n\n"
+                        result_info += f"📁 Şifreli Dosya: {original_filename}\n"
+                        result_info += f"📁 Çözülmüş Dosya: {self.decrypted_filename}\n"
+                        result_info += f"🔐 Algoritma: {algorithm}\n"
+                        result_info += f"🔑 Anahtar: {key}\n"
+                        result_info += f"📊 Şifreli Boyut: {len(encrypted_data):,} bytes\n"
+                        result_info += f"📊 Orijinal Boyut: {len(self.decrypted_file_data):,} bytes\n\n"
+                        result_info += f"💾 Dosyayı kaydetmek için 'Sonucu Kaydet' butonuna tıklayın."
+                    else:
+                        error_msg = result.get('error', 'Bilinmeyen hata') if result else 'İşlem başarısız'
+                        raise ValueError(error_msg)
+                
+                self.root.after(0, lambda: self._update_server_file_result(result_info))
+                self.root.after(0, lambda: self._log_message(f"✅ Dosya deşifrelendi: {os.path.basename(file_path)}", "SUCCESS"))
 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Hata", f"Dosya deşifreleme hatası: {str(e)}"))
-                self.root.after(0, lambda: self._log_message(f"❌ Dosya deşifreleme hatası: {str(e)}", "ERROR"))
+                error_msg = str(e)
+                self.root.after(0, lambda: messagebox.showerror("Hata", f"Deşifreleme başarısız: {error_msg}"))
+                self.root.after(0, lambda: self._log_message(f"❌ Dosya deşifreleme hatası: {error_msg}", "ERROR"))
 
         threading.Thread(target=decrypt_thread, daemon=True).start()
 
@@ -456,9 +585,17 @@ class ServerWindow:
             "SUCCESS": "green"
         }.get(level, "black")
         
-        self.log_text.insert(tk.END, f"[{level}] {message}\n")
+        # Mesaj çok uzunsa buda (Tkinter donmasını önlemek için)
+        safe_message = str(message)
+        if len(safe_message) > 1000:
+            safe_message = safe_message[:997] + "..."
+        
+        self.log_text.insert(tk.END, f"[{level}] {safe_message}\n")
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
+        # Force GUI update for critical logs if necessary
+        if level in ["ERROR", "SUCCESS"]:
+            self.root.update_idletasks()
 
     def _start_server(self):
         """Server'ı başlatır"""
@@ -592,7 +729,7 @@ class ServerWindow:
                         self.proc_type_label.config(foreground="green")
                         self.input_label_var.set("🔐 Şifreli Giriş:")
                         self.output_label_var.set("🔓 DEŞİFRE EDİLMİŞ METİN:")
-                        prefix = "[HEX] " if is_binary_in else ""
+                        prefix = "[BASE64] " if is_binary_in else ""
                         input_display = prefix + str(input_data)
                     
                     # Input kutusu
@@ -631,8 +768,25 @@ class ServerWindow:
                     self.proc_output_text.config(state="normal")
                     self.proc_output_text.delete("1.0", tk.END)
                     
+                    # Hibrit işlem için özel görselleştirme (MANUEL AKIŞ)
+                    if operation.upper() == "HYBRID_MANUAL_FLOW":
+                        self.last_hybrid_data = event_data # Sakla
+                        enc_msg = event_data.get('encrypted_message', '')
+                        enc_key = event_data.get('encrypted_key', '')
+                        key_type = event_data.get('key_type', 'RSA')
+                        
+                        self.output_label_var.set("🔐 HİBRİT PAKET BİLEŞENLERİ (Çözüm Bekliyor):")
+                        self.hybrid_transfer_btn.config(state="normal")
+                        
+                        full_output = f"📦 ŞİFRELENMİŞ MESAJ (AES/DES):\n"
+                        full_output += f"{enc_msg}\n\n"
+                        full_output += f"🔑 ŞİFRELENMİŞ ANAHTAR ({key_type}):\n"
+                        full_output += f"{enc_key}\n\n"
+                        full_output += f"--------------------------------------------------\n"
+                        full_output += f"💡 İPUCU: 'Anahtarı Çöz' butonuyla bu verileri\n"
+                        full_output += f"aşağıdaki manuel araçlara taşıyıp adım adım çözebilirsiniz."
                     # Dosya işlemi için özel format
-                    if filename and operation.upper() == "ENCRYPT":
+                    elif filename and operation.upper() == "ENCRYPT":
                         full_output = f"✅ ŞİFRELENMİŞ DOSYA BİLGİLERİ:\n"
                         full_output += f"📁 Dosya Adı: {filename}.enc\n"
                         full_output += f"🔐 Algoritma: {algorithm}\n"
@@ -652,7 +806,7 @@ class ServerWindow:
                         full_output += f"✅ Dosya başarıyla deşifrelendi ve client'a gönderildi!"
                     else:
                         # Metin işlemi için normal format
-                        prefix = "[HEX] " if res_is_binary else ""
+                        prefix = "[BASE64] " if res_is_binary else ""
                         full_output = prefix + str(output_data)
                     
                     # Veri çok büyükse buda (Performans için)
@@ -676,13 +830,66 @@ class ServerWindow:
         
         self.root.after(0, update_gui)
 
+    def _transfer_to_manual(self):
+        """Hibrit bileşenleri manuel işlem tabına aktarır"""
+        if not self.last_hybrid_data:
+            return
+            
+        enc_msg = self.last_hybrid_data.get('encrypted_message', '')
+        enc_key = self.last_hybrid_data.get('encrypted_key', '')
+        key_type = self.last_hybrid_data.get('key_type', 'RSA').lower()
+        target_algo = self.last_hybrid_data.get('algorithm', 'aes').lower()
+        
+        # 1. Anahtarı Giriş'e koy, algoritmayı RSA/ECC yap (Önce anahtar çözülmeli)
+        self.man_input_text.delete("1.0", tk.END)
+        self.man_input_text.insert(tk.END, enc_key)
+        self.man_algo_var.set(key_type)
+        self.man_key_var.set("") # Anahtarı temizle ki kullanıcı yenisini koysun
+        
+        # Bilgi mesajı
+        messagebox.showinfo("Hibrit Transfer", 
+            f"🚀 Hibrit paket bileşenleri manuel araçlara aktarıldı!\n\n"
+            f"ADIM 1: Şifreli ANAHTAR giriş alanında. '{key_type.upper()}' seçildi.\n"
+            f"       'Sunucu Anahtarını Getir' butonuna basıp ardından 'Deşifrele'ye tıklayın.\n\n"
+            f"ADIM 2: Çıkan sonucu kopyalayıp 'Anahtar' alanına yapıştırın.\n\n"
+            f"ADIM 3: Yukarıdaki 'ŞİFRELENMİŞ MESAJ'ı giriş alanına yapıştırın.\n"
+            f"       Algoritmayı '{target_algo.upper()}' yapıp tekrar 'Deşifrele'ye basın.")
+        
+        # Loga da bilgiyi yaz (Büyük veriyi budayarak)
+        self._log_message(f"🧪 TRANSFER: Şifreli Mesaj hazır (Boyut: {len(enc_msg)} bytes)", "INFO")
+        self._log_message(f"🔑 TRANSFER: Şifreli Anahtar: {enc_key[:100]}...", "INFO")
+
+    def _fetch_server_private_key(self):
+        """Sunucunun özel anahtarını manuel anahtar alanına getirir"""
+        if not self.key_manager:
+            messagebox.showerror("Hata", "Key Manager hazır değil!")
+            return
+            
+        algo = self.man_algo_var.get().lower()
+        try:
+            if 'rsa' in algo:
+                private_key = self.key_manager.get_server_private_key()
+                priv_b64 = base64.b64encode(private_key).decode('utf-8')
+                self.man_key_var.set(priv_b64)
+                self._log_message("🔑 Sunucu RSA özel anahtarı yüklendi.", "INFO")
+            elif 'ecc' in algo:
+                # ECC private key'i al (KeyManager'dan)
+                private_key, _ = self.key_manager.generate_ecc_key_pair() # Mevcut olanı döndürür
+                priv_b64 = base64.b64encode(private_key).decode('utf-8')
+                self.man_key_var.set(priv_b64)
+                self._log_message("🔑 Sunucu ECC özel anahtarı yüklendi.", "INFO")
+            else:
+                messagebox.showwarning("Uyarı", "Özel anahtar sadece RSA veya ECC algoritmaları için geçerlidir.")
+        except Exception as e:
+            messagebox.showerror("Hata", f"Anahtar getirme hatası: {str(e)}")
+
     def _copy_result(self):
         """İşlenmiş sonucu panoya kopyalar"""
         data = self.proc_output_text.get("1.0", tk.END).strip()
         if data and data != "İşleniyor...":
-            # [HEX] prefix'ini temizle eğer varsa
-            if data.startswith("[HEX] "):
-                data = data[6:]
+            # [BASE64] prefix'ini temizle eğer varsa
+            if data.startswith("[BASE64] "):
+                data = data[9:]
             self.root.clipboard_clear()
             self.root.clipboard_append(data)
             messagebox.showinfo("Başarılı", "Sonuç panoya kopyalandı!")
@@ -694,6 +901,13 @@ class ServerWindow:
             self.root.clipboard_clear()
             self.root.clipboard_append(data)
             messagebox.showinfo("Başarılı", "Anahtar kopyalandı!")
+
+    def _copy_to_clipboard(self, text):
+        """Genel kopyalama yardımcısı"""
+        if text:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self._log_message("📋 Metin panoya kopyalandı.", "INFO")
 
     def _clear_logs(self):
         """Log alanını temizler"""

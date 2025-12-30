@@ -1,14 +1,15 @@
 """
-ProcessingManager - Şifreleme İşlemlerini Yöneten Ana Sınıf
-
-Bu sınıf, server tarafında tüm şifreleme ve deşifreleme işlemlerini yönetir.
-Client'tan gelen istekleri alır, uygun algoritmayı seçer ve işlemi gerçekleştirir.
+ProcessingManager, server tarafında tüm şifreleme ve deşifreleme işlemlerini
+merkezi ve güvenli bir şekilde yöneten ana kontrol sınıfıdır.
+Client’tan gelen istekleri doğrular, uygun algoritmayı seçer ve
+tüm kriptografik işlemleri yalnızca server üzerinde gerçekleştirir.
 
 ÖNEMLİ: Tüm şifreleme işlemleri SERVER tarafında yapılır, client tarafında değil!
 Bu, gerçek hayattaki güvenli sistemlerin çalışma mantığıyla aynıdır.
 """
 
 import time
+import base64
 from typing import Dict, Any, Optional
 from shared.utils import Logger
 from shared.advanced_logger import advanced_logger
@@ -111,6 +112,11 @@ class ProcessingManager:
             from algorithms.RSAManual import RSAManual
             self.algorithms['rsa_manual'] = RSAManual()
 
+            # ECC - Elliptic Curve Cryptography (Key Agreement)
+            from algorithms.ECCCipher import ECCCipher
+            self.algorithms['ecc'] = ECCCipher()
+            self.algorithms['ecc_lib'] = self.algorithms['ecc']
+
             # IDEA - International Data Encryption Algorithm (Kütüphaneli)
             from algorithms.IDEACipher import IDEACipher
             self.algorithms['idea'] = IDEACipher()
@@ -118,6 +124,21 @@ class ProcessingManager:
             # IRON - International Data Encryption Algorithm (Feistel Variation)
             from algorithms.IronCipher import IronCipher
             self.algorithms['iron'] = IronCipher()
+
+            # --- Hybrid Aliases (Manuel Laboratuvar Desteği İçin) ---
+            # Bunlar aslında standart simetrik algoritmaları kullanır, 
+            # sadece GUI'deki isim karmaşasını önlemek için alias olarak eklenmiştir.
+            self.algorithms['hybrid_aes'] = self.algorithms['aes']
+            self.algorithms['hybrid_aes_manual'] = self.algorithms['aes_manual']
+            self.algorithms['hybrid_des'] = self.algorithms['des']
+            self.algorithms['hybrid_des_manual'] = self.algorithms['des_manual']
+            self.algorithms['hybrid_des_lib'] = self.algorithms['des']
+            
+            # ECC Hybrid Aliases
+            self.algorithms['hybrid_ecc_aes'] = self.algorithms['aes']
+            self.algorithms['hybrid_ecc_aes_manual'] = self.algorithms['aes_manual']
+            self.algorithms['hybrid_ecc_des'] = self.algorithms['des']
+            self.algorithms['hybrid_ecc_des_manual'] = self.algorithms['des_manual']
 
             Logger.info(f"{len(self.algorithms)} algoritma başarıyla kaydedildi", "ProcessingManager")
 
@@ -240,7 +261,6 @@ class ProcessingManager:
                 
                 if not is_file and algorithm in ['rsa', 'rsa_manual', 'rsa_lib'] and (isinstance(key, str) and (key.lower() == 'generate' or not key or key.strip() == '')):
                     if hasattr(cipher, '_last_generated_private_key') and cipher._last_generated_private_key:
-                        import base64
                         private_key_b64 = base64.b64encode(cipher._last_generated_private_key).decode('utf-8')
                         # RSA için şifrelenmiş veriyi de Base64 yap ki metin olarak gösterilebilsin
                         encrypted_b64 = base64.b64encode(result_data).decode('utf-8')
@@ -263,8 +283,19 @@ class ProcessingManager:
                 
                 if not is_file:
                     try:
-                        # Metin işlemleri için etiket temizleme ve otomatik tespit yap
-                        data_str = data.decode('utf-8', errors='ignore').strip()
+                        # Giriş verisinin gerçekten bir B64/Hex string olup olmadığını kontrol et
+                        # Eğer veri içinde çok sayıda binary (printable olmayan) karakter varsa, 
+                        # bu muhtemelen zaten çözülmüş/ham binary veridir, dokunma.
+                        is_printable = True
+                        if len(data) > 0:
+                            # İlk 100 byte'ı kontrol et (performans için)
+                            sample = data[:100]
+                            non_printable = sum(1 for b in sample if not (32 <= b <= 126 or b in [9, 10, 13]))
+                            if non_printable > len(sample) * 0.3: # %30'dan fazlası binary ise
+                                is_printable = False
+                        
+                        if is_printable:
+                            data_str = data.decode('utf-8', errors='ignore')
                         
                         # 0. ETİKETLERİ TEMİZLE
                         lines = data_str.split('\n')
@@ -288,6 +319,8 @@ class ProcessingManager:
                             if any(tag in line_strip for tag in [
                                 "Şifrelenmiş Metin:", "Şifrelenmiş Veri (Hex):", 
                                 "Hex Formatı:", "Base64 Formatı:", "Şifrelenmiş Veri (Base64):",
+                                "📦 ŞİFRELENMİŞ MESAJ (AES/DES):", "🔑 ŞİFRELENMİŞ ANAHTAR (RSA):",
+                                "🔑 ŞİFRELENMİŞ ANAHTAR (ECC):",
                                 "⚠️ ÖNEMLİ:", "Boyut:", "Not:"
                             ]):
                                 continue
@@ -302,40 +335,44 @@ class ProcessingManager:
                             else:
                                 data_str = "\n".join(clean_lines)
 
-                        # Algoritma binary desteklemiyorsa (Klasik şifreleme), auto-decode yapma
-                        supports_binary = getattr(cipher, 'supports_binary', True)
-                        
-                        if supports_binary:
-                            # 1. HEX KONTROLÜ
-                            hex_candidate = data_str.replace(" ", "").replace("\n", "").replace("\r", "")
-                            if all(c in '0123456789abcdefABCDEF' for c in hex_candidate) and len(hex_candidate) % 2 == 0 and len(hex_candidate) > 0:
-                                import binascii
-                                try:
-                                    temp_data = binascii.unhexlify(hex_candidate)
-                                    Logger.info("💡 Giriş verisi HEX olarak algılandı.", "ProcessingManager")
-                                except:
-                                    temp_data = data_str.encode('utf-8')
+                            # Algoritma binary desteklemiyorsa (Klasik şifreleme), auto-decode yapma
+                            supports_binary = getattr(cipher, 'supports_binary', True)
                             
-                            # 2. BASE64 KONTROLÜ
-                            else:
-                                base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
-                                b64_candidate = hex_candidate
-                                is_likely_b64 = (len(b64_candidate) > 8 and (b64_candidate.endswith('=') or (len(b64_candidate) % 4 == 0)))
-                                
-                                if is_likely_b64 and all(c in base64_chars for c in b64_candidate) and len(b64_candidate) > 0:
-                                    import base64
+                            if supports_binary:
+                                # 1. HEX KONTROLÜ
+                                hex_candidate = data_str.replace(" ", "").replace("\n", "").replace("\r", "")
+                                if all(c in '0123456789abcdefABCDEF' for c in hex_candidate) and len(hex_candidate) % 2 == 0 and len(hex_candidate) > 0:
+                                    import binascii
                                     try:
-                                        missing_padding = len(b64_candidate) % 4
-                                        if missing_padding: b64_candidate += '=' * (4 - missing_padding)
-                                        temp_data = base64.b64decode(b64_candidate)
-                                        Logger.info("💡 Giriş verisi BASE64 olarak algılandı.", "ProcessingManager")
+                                        temp_data = binascii.unhexlify(hex_candidate)
+                                        Logger.info("💡 Giriş verisi HEX olarak algılandı.", "ProcessingManager")
                                     except:
                                         temp_data = data_str.encode('utf-8')
+                                
+                                # 2. BASE64 KONTROLÜ
                                 else:
-                                    temp_data = data_str.encode('utf-8')
+                                    base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+                                    b64_candidate = hex_candidate
+                                    is_likely_b64 = (len(b64_candidate) > 8 and (b64_candidate.endswith('=') or (len(b64_candidate) % 4 == 0)))
+                                    
+                                    if is_likely_b64 and all(c in base64_chars for c in b64_candidate) and len(b64_candidate) > 0:
+                                        import base64
+                                        try:
+                                            missing_padding = len(b64_candidate) % 4
+                                            if missing_padding: b64_candidate += '=' * (4 - missing_padding)
+                                            temp_data = base64.b64decode(b64_candidate)
+                                            Logger.info("💡 Giriş verisi BASE64 olarak algılandı.", "ProcessingManager")
+                                        except:
+                                            temp_data = data_str.encode('utf-8')
+                                    else:
+                                        temp_data = data_str.encode('utf-8')
+                            else:
+                                temp_data = data_str.encode('utf-8')
+                                Logger.debug(f"💡 {algorithm} klasik şifreleme; direkt metin kullanılıyor.", "ProcessingManager")
                         else:
-                            temp_data = data_str.encode('utf-8')
-                            Logger.debug(f"💡 {algorithm} klasik şifreleme; direkt metin kullanılıyor.", "ProcessingManager")
+                            # Printable değilse olduğu gibi kullan
+                            temp_data = data
+                            Logger.debug(f"💡 Veri binary olarak algılandı, otomatik tespit atlandı.", "ProcessingManager")
                     except Exception as e:
                         Logger.debug(f"Otomatik veri tespit hatası: {str(e)}", "ProcessingManager")
                 else:

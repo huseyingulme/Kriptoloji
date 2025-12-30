@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
 import threading
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from client.network.Client import Client
 from client.file.FileManager import FileManager
 from client.hybrid_encryption import HybridEncryptionManager
@@ -15,11 +15,12 @@ class MainWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Kriptoloji Projesi - Şifreleme/Çözme Sistemi")
-        self.root.geometry("900x700")
+        self.root.geometry("900x1000")
         self.root.resizable(True, True)
 
         self.client: Optional[Client] = None
         self.file_manager = FileManager()
+        self.hybrid_manager = HybridEncryptionManager()
 
         self.server_host_var = tk.StringVar(value="localhost")
         self.server_port_var = tk.StringVar(value="12345")
@@ -35,6 +36,7 @@ class MainWindow:
         self._create_menu()
 
         self._on_algorithm_changed()
+        self._on_operation_changed()
 
     def _get_algorithm_list(self):
         """Tüm şifreleme algoritmalarının listesini döndürür."""
@@ -46,8 +48,10 @@ class MainWindow:
             "aes", "des", "idea", "iron",
             # Modern Simetrik Şifreleme (Manuel)
             "aes_manual", "des_manual",
-            # Asimetrik Şifreleme
+            # Asimetrik & Hibrit Şifreleme
             "rsa", "rsa_manual",
+            "hybrid_aes", "hybrid_aes_manual", "hybrid_des", "hybrid_des_manual",
+            "hybrid_ecc_aes", "hybrid_ecc_aes_manual", "hybrid_ecc_des", "hybrid_ecc_des_manual"
         ]
 
     def _create_widgets(self):
@@ -140,10 +144,10 @@ class MainWindow:
         operation_frame = ttk.Frame(settings_frame)
         operation_frame.grid(row=3, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(10, 0))
 
-        ttk.Radiobutton(operation_frame, text="Şifrele", variable=self.operation_var,
-                       value="encrypt").pack(side=tk.LEFT, padx=(0, 20))
-        ttk.Radiobutton(operation_frame, text="Çöz", variable=self.operation_var,
-                       value="decrypt").pack(side=tk.LEFT)
+        tk.Radiobutton(operation_frame, text="Şifrele", variable=self.operation_var,
+                       value="encrypt", command=self._on_operation_changed).pack(side=tk.LEFT, padx=(0, 20))
+        tk.Radiobutton(operation_frame, text="Çöz", variable=self.operation_var,
+                       value="decrypt", command=self._on_operation_changed).pack(side=tk.LEFT)
 
         self.process_button = ttk.Button(settings_frame, text="İşlemi Başlat", command=self._process_text)
         self.process_button.grid(row=4, column=0, pady=(10, 0))
@@ -207,10 +211,10 @@ class MainWindow:
         operation_frame = ttk.Frame(settings_frame)
         operation_frame.grid(row=2, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(10, 0))
 
-        ttk.Radiobutton(operation_frame, text="Şifrele", variable=self.operation_var,
-                       value="encrypt").pack(side=tk.LEFT, padx=(0, 20))
-        ttk.Radiobutton(operation_frame, text="Çöz", variable=self.operation_var,
-                       value="decrypt").pack(side=tk.LEFT)
+        tk.Radiobutton(operation_frame, text="Şifrele", variable=self.operation_var,
+                       value="encrypt", command=self._on_operation_changed).pack(side=tk.LEFT, padx=(0, 20))
+        tk.Radiobutton(operation_frame, text="Çöz", variable=self.operation_var,
+                       value="decrypt", command=self._on_operation_changed).pack(side=tk.LEFT)
 
         self.file_process_button = ttk.Button(settings_frame, text="Dosyayı İşle", command=self._process_file)
         self.file_process_button.grid(row=3, column=0, pady=(10, 0))
@@ -299,9 +303,14 @@ class MainWindow:
                         public_key = self.client.request_public_key()
                         if public_key:
                             Logger.info("RSA public key alındı", "MainWindow")
+                            self.hybrid_manager.set_server_public_key(public_key)
+                        
+                        ecc_public_key = self.client.request_ecc_public_key()
+                        if ecc_public_key:
+                            Logger.info("ECC public key alındı", "MainWindow")
+                            self.hybrid_manager.server_ecc_public_key = ecc_public_key
                     except Exception as e:
-                        Logger.warning(f"RSA public key alınamadı: {str(e)}", "MainWindow")
-                        # Public key alınamasa bile bağlantı devam edebilir
+                        Logger.warning(f"Public key'ler alınamadı: {str(e)}", "MainWindow")
                     
                     self.root.after(0, lambda: self.server_status_var.set(f"Bağlı ({host}:{port})"))
                     self.root.after(0, lambda: self.status_label.config(foreground="green"))
@@ -361,22 +370,31 @@ class MainWindow:
         threading.Thread(target=test_thread, daemon=True).start()
 
     def _process_text(self):
-        text = self.text_input.get("1.0", tk.END).strip()
-        if not text:
-            messagebox.showwarning("Uyarı", "Lütfen işlenecek metin girin.")
+        input_text = self.text_input.get("1.0", tk.END).strip()
+        if not input_text:
+            messagebox.showwarning("Uyarı", "Giriş verisi boş olamaz!")
             return
 
-        if not self.client or not self.client.is_connected():
-            messagebox.showerror("Hata", "Server bağlantısı yok.")
-            return
-
+        operation = "ENCRYPT" if self.operation_var.get() == "encrypt" else "DECRYPT"
+        algorithm = self.algorithm_var.get()
         key = self.key_var.get().strip()
-        if not key:
-            messagebox.showwarning("Uyarı", "Lütfen anahtar girin.")
-            return
+
+        # Şifrelemede anahtar boş veya otomatik ise üret
+        if operation == "ENCRYPT":
+            if not key or "OTOMATİK" in key.upper():
+                if algorithm == "pigpen" or algorithm == "polybius":
+                    key = ""
+                else:
+                    key = self._generate_random_key(algorithm)
+                    self.key_var.set(key)
+        else:
+            # Çözmede anahtar boş olamaz
+            if not key and algorithm not in ["pigpen", "polybius"]:
+                messagebox.showwarning("Uyarı", "Lütfen deşifreleme anahtarını girin.")
+                return
 
         if not self._validate_key(key):
-            messagebox.showerror("Hata", "Geçersiz anahtar formatı. Lütfen algoritma bilgilerini kontrol edin.")
+            messagebox.showerror("Hata", "Geçersiz anahtar formatı.")
             return
 
         def process_thread():
@@ -397,8 +415,12 @@ class MainWindow:
 
                 self.root.after(0, lambda: self.progress_var.set(30))
                 
+                # Hibrit algoritmalar için özel durum: Magic Base64/Hex parse işlemini atla
+                if algorithm.startswith("hybrid_") and operation == "DECRYPT":
+                    data = process_text.encode('utf-8')
+                    Logger.info(f"Hibrit paket ham metin olarak alındı.", "MainWindow")
                 # Çözme işlemi için hex ve base64 string kontrolü
-                if operation == "DECRYPT":
+                elif operation == "DECRYPT":
                     import base64 as b64
                     
                     # Klasik şifreleme algoritmaları listesi (boşlukları korumalı)
@@ -486,22 +508,21 @@ class MainWindow:
                 
                 # Hibrit şifreleme kontrolü
                 if algorithm.startswith("hybrid_"):
-                    if operation == "DECRYPT":
-                        self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Client tarafında hibrit çözme desteklenmez."))
-                        response = None
-                    else:
-                        # Hibrit şifreleme
-                        # "hybrid_aes" -> "aes"
-                        target_algo = algorithm.replace("hybrid_", "")
+                        if operation == "DECRYPT":
+                            response = self.client.send_hybrid_packet(data)
+                        else:
+                            # Hibrit şifreleme
+                            packet_bytes, encrypted_message, encrypted_key = self._get_hybrid_packet(data, algorithm, metadata)
                         
-                        # Paket oluştur
-                        packet_bytes = self.hybrid_manager.encrypt_and_package(
-                            message=data,
-                            algorithm=target_algo,
-                            use_manual="manual" in target_algo,
-                            metadata=metadata
-                        )
+                        # EKRANDA ÖNCE ŞİFRELİ HALİNİ GÖSTER (Kullanıcı "Şifrele" dediğinde bunu bekler)
+                        import base64
+                        c_text_b64 = base64.b64encode(encrypted_message).decode('utf-8')
+                        k_text_b64 = base64.b64encode(encrypted_key).decode('utf-8')
                         
+                        self.local_hybrid_result = f"🔐 YEREL ŞİFRELENMİŞ VERİ (Base64):\n{c_text_b64}\n\n🔑 ŞİFRELENMİŞ ANAHTAR (Base64):\n{k_text_b64}\n\n"
+                        self.local_hybrid_result += f"📡 Paket server'a gönderildi, doğrulama bekleniyor..."
+                        self.root.after(0, lambda: self._update_text_result(self.local_hybrid_result))
+
                         # Gönder
                         response = self.client.send_hybrid_packet(packet_bytes)
                 else:
@@ -569,6 +590,22 @@ class MainWindow:
                             result_text = result_data.hex()
 
                     self.root.after(0, lambda: self.progress_var.set(100))
+                    
+                    # Hibrit işlemlerde özel mesaj göster
+                    if algorithm.startswith("hybrid_"):
+                        try:
+                            decoded_result = result_data.decode('utf-8', errors='ignore')
+                            self.root.after(0, lambda: messagebox.showinfo("Hibrit Başarılı", f"Paket gönderildi ve server tarafından başarıyla çözüldü!\n\nÇözülen Metin: {decoded_result[:50]}..."))
+                            
+                            # Mevcut şifreli sonucu koru, üzerine "DOĞRULANDI" ekle
+                            if hasattr(self, 'local_hybrid_result'):
+                                result_text = self.local_hybrid_result.replace("📡 Paket server'a gönderildi, doğrulama bekleniyor...", "✅ SERVER DOĞRULAMASI BAŞARILI!")
+                                result_text += f"\n\n🔓 SERVER TARAFINDAN ÇÖZÜLEN METİN:\n{decoded_result}"
+                            else:
+                                result_text = f"✅ SERVER TARAFINDAN ÇÖZÜLEN METİN:\n{decoded_result}"
+                        except:
+                            result_text = f"✅ Paket server tarafından başarıyla çözüldü (Binary)."
+                    
                     self.root.after(0, lambda: self._update_text_result(result_text))
                 else:
                     error_msg = "İşlem başarısız."
@@ -615,13 +652,26 @@ class MainWindow:
             messagebox.showerror("Hata", "Server bağlantısı yok.")
             return
 
+        operation = "ENCRYPT" if self.operation_var.get() == "encrypt" else "DECRYPT"
+        algorithm = self.algorithm_var.get()
         key = self.key_var.get().strip()
-        if not key:
-            messagebox.showwarning("Uyarı", "Lütfen anahtar girin.")
-            return
+
+        # Şifrelemede anahtar boş veya otomatik ise üret
+        if operation == "ENCRYPT":
+            if not key or "OTOMATİK" in key.upper():
+                if algorithm == "pigpen" or algorithm == "polybius":
+                    key = ""
+                else:
+                    key = self._generate_random_key(algorithm)
+                    self.key_var.set(key)
+        else:
+            # Çözmede anahtar boş olamaz
+            if not key and algorithm not in ["pigpen", "polybius"]:
+                messagebox.showwarning("Uyarı", "Lütfen deşifreleme anahtarını girin.")
+                return
 
         if not self._validate_key(key):
-            messagebox.showerror("Hata", "Geçersiz anahtar formatı. Lütfen algoritma bilgilerini kontrol edin.")
+            messagebox.showerror("Hata", "Geçersiz anahtar formatı.")
             return
 
         def process_thread():
@@ -636,12 +686,12 @@ class MainWindow:
 
                 operation = "ENCRYPT" if self.operation_var.get() == "encrypt" else "DECRYPT"
                 algorithm = self.algorithm_var.get()
+                
                 key = self.key_var.get()
-                algorithm = self.algorithm_var.get()
-
+                
                 # Pigpen cipher ve Hibrit mod anahtar gerektirmez
                 if algorithm != "pigpen" and not algorithm.startswith("hybrid_") and not key:
-                    self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Lütfen anahtar girin."))
+                    self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Anahtar bulunamadı. Lütfen 'Şifrele' modunu seçin veya anahtar girin."))
                     self.root.after(0, lambda: self.file_progress_var.set(0))
                     self.root.after(0, lambda: self.file_process_button.config(state="normal", text="Dosyayı İşle"))
                     return
@@ -660,17 +710,13 @@ class MainWindow:
                 
                 if algorithm.startswith("hybrid_"):
                     if operation == "DECRYPT":
-                        self.root.after(0, lambda: messagebox.showwarning("Uyarı", "Client tarafında hibrit çözme desteklenmez."))
-                        response = None
+                        response = self.client.send_hybrid_packet(file_data)
                     else:
                          # Hibrit şifreleme
-                        target_algo = algorithm.replace("hybrid_", "")
-                        packet_bytes = self.hybrid_manager.encrypt_and_package(
-                            message=file_data,
-                            algorithm=target_algo,
-                            use_manual="manual" in target_algo,
-                            metadata=metadata
-                        )
+                        packet_bytes, encrypted_message, encrypted_key = self._get_hybrid_packet(file_data, algorithm, metadata)
+                        
+                        # DOSYA OLARAK KAYDEDİLECEK VERİ: TÜM PAKET (JSON)
+                        self._hybrid_file_packet = packet_bytes
                         response = self.client.send_hybrid_packet(packet_bytes)
                 else:    
                     response = self.client.process_request(file_data, operation, algorithm, key, metadata)
@@ -678,7 +724,13 @@ class MainWindow:
                 self.root.after(0, lambda: self.file_progress_var.set(80))
 
                 if response and response.get('success'):
-                    result_data = response['data']
+                    # Hibrit şifrelemede result_data server'dan gelen plaintext'tir.
+                    # Ama biz dosyayı ŞİFRELİ (Packet) olarak kaydetmek istiyoruz.
+                    if algorithm.startswith("hybrid_") and operation == "ENCRYPT":
+                        result_data = self._hybrid_file_packet
+                    else:
+                        result_data = response['data']
+                    
                     self._current_file_result = result_data
                     
                     # Dosya bilgilerini hazırla
@@ -951,7 +1003,8 @@ class MainWindow:
 
             files = self.file_manager.list_files()
             for file_info in files:
-                metadata = file_info.get('metadata', {})
+                if not file_info: continue
+                metadata = file_info.get('metadata', {}) or {}
                 algorithm = metadata.get('algorithm', 'Bilinmiyor')
 
                 self.saved_files_tree.insert("", "end",
@@ -1064,6 +1117,8 @@ class MainWindow:
                 self.implementation_mode_var.set('manual')
             else:
                 self.implementation_mode_var.set('library')
+        
+        self._on_operation_changed()
     
     def _on_mode_changed(self, event=None):
         """Kütüphane/Manuel mod değiştiğinde çağrılır."""
@@ -1090,6 +1145,69 @@ class MainWindow:
 
         # Algoritma bilgisini güncelle
         self._on_algorithm_changed()
+
+    def _on_operation_changed(self):
+        """İşlem tipi değiştiğinde çağrılır."""
+        operation = self.operation_var.get()
+        algorithm = self.algorithm_var.get()
+        
+        # Hibrit modda anahtar girişi her zaman kapalıdır
+        if algorithm.startswith("hybrid_"):
+            self.key_entry.config(state='disabled')
+            self.file_key_entry.config(state='disabled')
+            self.key_var.set("OTOMATİK (Session Key)")
+            return
+
+        if operation == "encrypt":
+            # Şifrelemede anahtar girişi kapalı (Random kuralı)
+            self.key_entry.config(state='disabled')
+            self.file_key_entry.config(state='disabled')
+            self.key_var.set("OTOMATİK ÜRETİLECEK")
+        else:
+            # Çözmede anahtar girişi açık (Pasted key)
+            self.key_entry.config(state='normal')
+            self.file_key_entry.config(state='normal')
+            if "OTOMATİK" in self.key_var.get():
+                self.key_var.set("")
+
+    def _generate_random_key(self, algorithm: str) -> str:
+        """Her algoritma için uygun formatta rastgele anahtar üretir."""
+        import random, string
+        
+        if algorithm == "caesar":
+            return str(random.randint(1, 25))
+        elif algorithm == "vigenere":
+            return "".join(random.choices(string.ascii_uppercase, k=8))
+        elif algorithm == "affine":
+            a_list = [1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25]
+            return f"{random.choice(a_list)},{random.randint(0, 25)}"
+        elif algorithm == "hill":
+            # Determinantı 26 ile aralarında asal olan basit rastgele matrisler
+            safe_hills = ["3,3,2,5", "9,7,1,2", "5,8,17,3"]
+            return random.choice(safe_hills)
+        elif algorithm == "playfair":
+            return "".join(random.choices(string.ascii_uppercase, k=10)).replace('J', 'I')
+        elif algorithm == "railfence":
+            return str(random.randint(2, 6))
+        elif algorithm == "columnar":
+            return "".join(random.choices(string.ascii_uppercase, k=7))
+        elif algorithm == "polybius":
+            return ""
+        elif algorithm == "substitution":
+            alphabet = list(string.ascii_uppercase)
+            random.shuffle(alphabet)
+            return "".join(alphabet)
+        elif algorithm == "route":
+            return f"4:4:{random.choice(['spiral', 'row', 'column', 'diagonal'])}"
+        elif algorithm in ["aes", "aes_manual", "aes_lib", "idea"]:
+            return "".join(random.choices(string.ascii_letters + string.digits, k=16))
+        elif algorithm in ["des", "des_manual", "des_lib"]:
+            return "".join(random.choices(string.ascii_letters + string.digits, k=8))
+        elif algorithm == "iron":
+            return "".join(random.choices(string.ascii_letters + string.digits, k=16))
+        elif algorithm in ["rsa", "rsa_manual", "rsa_lib"]:
+            return "generate"
+        return "random_key_123"
 
     def _get_algorithm_key_info(self, algorithm: str) -> str:
 
@@ -1358,8 +1476,11 @@ Güvenlik: Yüksek (Dinamik yapısı sayesinde brute-force ve analiz saldırıla
         messagebox.showinfo(f"{algorithm.upper()} Algoritması", description)
 
     def _validate_key(self, key: str) -> bool:
-
+        """Anahtarın seçilen algoritma için uygun formatta olup olmadığını kontrol eder."""
         algorithm = self.algorithm_var.get()
+
+        if algorithm.startswith("hybrid_") or "OTOMATİK" in key.upper():
+            return True
 
         if algorithm == "caesar":
             try:
@@ -1680,25 +1801,52 @@ Güvenlik: Yüksek (Dinamik yapısı sayesinde brute-force ve analiz saldırıla
     def run(self):
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
         self.root.mainloop()
+    def _get_hybrid_packet(self, data: bytes, algorithm: str, metadata: Dict) -> Tuple[bytes, bytes, bytes]:
+        """Hibrit paket oluşturur (ECC veya RSA otomatik seçer)."""
+        target_algo = algorithm.replace("hybrid_", "")
+        
+        if "ecc" in algorithm:
+            # ECC Hybrid
+            target_algo = target_algo.replace("ecc_", "")
+            encrypted_message, encrypted_key, algo_name = self.hybrid_manager.encrypt_message_ecc(
+                message=data,
+                symmetric_algo=target_algo
+            )
+            packet_bytes = self.hybrid_manager.create_hybrid_packet(
+                encrypted_message, encrypted_key, algo_name, key_type='ECC', metadata=metadata
+            )
+        else:
+            # RSA Hybrid
+            packet_bytes, encrypted_message, encrypted_key = self.hybrid_manager.encrypt_and_package(
+                message=data,
+                algorithm=target_algo,
+                use_manual="manual" in target_algo,
+                metadata=metadata
+            )
+        
+        return packet_bytes, encrypted_message, encrypted_key
+
     def _on_algorithm_changed(self, event=None):
         algo = self.algorithm_var.get()
+        operation = self.operation_var.get()
         
-        # Hibrit modda anahtar girişini kapat
-        if algo.startswith("hybrid_"):
-            self.key_entry.delete(0, tk.END)
+        # Hibrit modda veya Şifreleme modunda anahtar girişini kapat
+        if algo.startswith("hybrid_") or operation == "encrypt":
             self.key_entry.config(state="disabled")
-            self.file_key_entry.delete(0, tk.END)
             self.file_key_entry.config(state="disabled")
+            
+            if algo.startswith("hybrid_"):
+                self.key_var.set("OTOMATİK (Session Key)")
+            else:
+                self.key_var.set("OTOMATİK ÜRETİLECEK")
+                
             self.key_info_label.config(text="Otomatik üretilir")
             self.file_key_info_label.config(text="Otomatik üretilir")
-            # Hibrit sadece şifreleme modunda çalışır (Client tarafında)
-            # Çözme işlemi server'da yapılır veya client'ta çözüm logic'i farklıdır
-            # Ama şimdilik sadece gönderme (encrypt) odaklı
-            
         else:
+            # Sadece Deşifreleme + Klasik modda aç
             self.key_entry.config(state="normal")
             self.file_key_entry.config(state="normal")
-            
-            # Algoritma değişikliğinde placeholder veya key bilgisi güncelle
-            # (Mevcut logic varsa buraya eklenebilir)
-            pass
+            if "OTOMATİK" in self.key_var.get():
+                self.key_var.set("")
+            self.key_info_label.config(text="")
+            self.file_key_info_label.config(text="")

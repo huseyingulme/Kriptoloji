@@ -6,14 +6,15 @@ class RailFenceCipher(BaseCipher):
     🔐 [Algorithm Overview]
     Type: Transposition Cipher
     A form of transposition cipher that derives its name from the way in which it is encoded.
+    It rearranges the message characters in a zigzag pattern across multiple "rails".
 
     🔑 [Key Management]
-    - The key is the number of "rails" (rows) used to write the message in a zigzag pattern.
+    - The key is the number of "rails" (rows) used to write the message.
 
     🧮 [Mathematical Foundation]
-    - Unlike substitution ciphers, this is a transposition-based method.
-    - It does not rely on Finite Field (GF) arithmetic for its transformations.
-    - It rearranges the positions of characters according to a periodic geometric pattern.
+    - Transposition-based method.
+    - Rearranges character positions according to a periodic geometric pattern.
+    - Period is 2 * (rails - 1).
     """
 
     def __init__(self):
@@ -26,8 +27,6 @@ class RailFenceCipher(BaseCipher):
         self.key_description = "Ray sayısı (örn: 3)"
         self.supports_binary = False
 
-
-
     def validate_key(self, key: str) -> bool:
         try:
             rails = int(key)
@@ -35,65 +34,94 @@ class RailFenceCipher(BaseCipher):
         except Exception:
             return False
 
-
     def encrypt(self, data: bytes, key: str) -> bytes:
-        rails = int(key)
-        text = data.decode("utf-8", errors="ignore")
+        """
+        Rail Fence şifreleme işlemi.
+        
+        Args:
+            data: Şifrelenecek veri (bytes)
+            key: Ray sayısı (str)
+        Returns:
+            bytes: Şifrelenmiş veri
+        """
+        try:
+            rails = int(key)
+            text = data.decode("utf-8", errors="ignore")
+        except Exception:
+            return data
 
         if rails < 2 or not text:
             return data
 
+        # Rayları oluştur
         fence = [[] for _ in range(rails)]
         rail = 0
-        direction = 1  # aşağı +1, yukarı -1
+        direction = 1  # 1: aşağı, -1: yukarı
 
+        # Zigzag desenine göre harfleri yerleştir
         for char in text:
             fence[rail].append(char)
-            rail += direction
+            
+            # Yön değiştirme kontrolü
+            if rails > 1:
+                rail += direction
+                if rail == rails - 1 or rail == 0:
+                    direction *= -1
 
-            if rail == 0 or rail == rails - 1:
-                direction *= -1
-
+        # Rayları sırayla birleştir
         encrypted = "".join("".join(row) for row in fence)
         return encrypted.encode("utf-8")
 
-
     def decrypt(self, data: bytes, key: str) -> bytes:
-        rails = int(key)
-        text = data.decode("utf-8", errors="ignore")
+        """
+        Rail Fence deşifreleme işlemi.
+        
+        Args:
+            data: Şifreli veri (bytes)
+            key: Ray sayısı (str)
+        Returns:
+            bytes: Çözülmüş veri
+        """
+        try:
+            rails = int(key)
+            text = data.decode("utf-8", errors="ignore")
+        except Exception:
+            return data
 
         if rails < 2 or not text:
             return data
 
-        # 1️⃣ Zigzag yolunu işaretle
-        pattern = [[] for _ in range(rails)]
+        # 1. Adım: Zigzag desenindeki boşlukları (markerları) belirle
+        pattern = [["" for _ in range(len(text))] for _ in range(rails)]
         rail = 0
         direction = 1
 
-        for _ in text:
-            pattern[rail].append("*")
-            rail += direction
+        for i in range(len(text)):
+            pattern[rail][i] = "*"
+            
+            if rails > 1:
+                rail += direction
+                if rail == rails - 1 or rail == 0:
+                    direction *= -1
 
-            if rail == 0 or rail == rails - 1:
-                direction *= -1
-
-        # 2️⃣ Şifreli metni raylara paylaştır
-        index = 0
+        # 2. Adım: Markerların olduğu yerlere şifreli metindeki harfleri yerleştir
+        idx = 0
         for r in range(rails):
-            length = len(pattern[r])
-            pattern[r] = list(text[index:index + length])
-            index += length
+            for c in range(len(text)):
+                if pattern[r][c] == "*" and idx < len(text):
+                    pattern[r][c] = text[idx]
+                    idx += 1
 
-        # 3️⃣ Zigzag sırasına göre geri oku
+        # 3. Adım: Zigzag desenine göre matrisi oku
         result = []
         rail = 0
         direction = 1
-
-        for _ in text:
-            result.append(pattern[rail].pop(0))
-            rail += direction
-
-            if rail == 0 or rail == rails - 1:
-                direction *= -1
+        for i in range(len(text)):
+            result.append(pattern[rail][i])
+            
+            if rails > 1:
+                rail += direction
+                if rail == rails - 1 or rail == 0:
+                    direction *= -1
 
         return "".join(result).encode("utf-8")

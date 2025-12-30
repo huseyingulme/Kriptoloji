@@ -11,6 +11,7 @@ Client sadece veri gönderir ve sonucu alır.
 import socket
 import threading
 import time
+import base64
 from typing import Optional, Dict, Any, Callable
 from shared.utils import DataPacket, Logger
 from config import config_manager
@@ -47,7 +48,7 @@ class Server:
         self.key_manager = None  # RSA anahtar yönetimi
         self.hybrid_decryption_manager = None  # Hibrit çözme yöneticisi
         self.max_clients = config_manager.get("server.max_clients", 10)
-        self.timeout = config_manager.get("server.timeout", 30)
+        self.timeout = config_manager.get("server.timeout", 300)
         self.operation_callback: Optional[Callable] = None  # İşlem logları için callback
         self.request_counter = 0
 
@@ -165,6 +166,11 @@ class Server:
                         self._process_hybrid_request(client_socket, packet_data)
                         continue
 
+                    # ECC_HANDSHAKE isteği - ECC public key talep etmek için
+                    if packet_type == 'ECC_HANDSHAKE':
+                        self._send_ecc_public_key(client_socket)
+                        continue
+
                     # Şifreleme/deşifreleme isteği
                     if packet_type in ['ENCRYPT', 'DECRYPT']:
                         self._process_request(client_socket, packet_data, packet_type, metadata)
@@ -218,46 +224,95 @@ class Server:
             Logger.error(f"Public key gönderme hatası: {str(e)}", "Server")
             self._send_error(client_socket, f"Public key gönderme hatası: {str(e)}")
 
+    def _send_ecc_public_key(self, client_socket: socket.socket):
+        """ECC_HANDSHAKE isteğine ECC public key gönderir."""
+        try:
+            if not self.key_manager:
+                self._send_error(client_socket, "Key manager bulunamadı")
+                return
+            
+            # ECC anahtar çifti oluştur veya mevcut olanı al (KeyManager üzerinden)
+            _, public_key = self.key_manager.generate_ecc_key_pair()
+            key_metadata = {
+                'type': 'ECC_PUBLIC_KEY',
+                'timestamp': time.time()
+            }
+            key_packet = DataPacket.create_packet(public_key, 'ECC_PUBLIC_KEY', key_metadata, use_json_format=WIRESHARK_MODE)
+            client_socket.sendall(key_packet)
+            Logger.info("ECC public key gönderildi", "Server")
+        except Exception as e:
+            Logger.error(f"ECC public key gönderme hatası: {str(e)}", "Server")
+            self._send_error(client_socket, f"ECC public key gönderme hatası: {str(e)}")
+
     def _process_hybrid_request(self, client_socket: socket.socket, packet: bytes):
-        """Hibrit şifreleme paketini işler (Manuel mod için güncellendi)."""
+        """Hibrit şifreleme paketini işler ve sonucu otomatik döndürür."""
         try:
             if not self.hybrid_decryption_manager:
                 self._send_error(client_socket, "Hibrit çözme yöneticisi bulunamadı")
                 return
 
-            # Paketi parse et ama ÇÖZME
-            packet_data = self.hybrid_decryption_manager.parse_hybrid_packet(packet)
-            
-            # Metadata'ya timestamp ekle
-            packet_data['timestamp'] = time.time()
-            packet_data['client'] = client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown'
-            packet_data['raw_packet'] = packet # Orijinal paketi sakla
-
-            # GUI'ye bildir (Paket alındı)
+            # 1. İşlem Başlangıcını GUI'ye bildir (Etiketlerin güncellenmesi için)
             if self.operation_callback:
-                self.operation_callback({
-                    'type': 'hybrid_packet_received',
-                    'client': packet_data['client'],
-                    'algorithm': packet_data['algorithm'],
-                    'packet_data': packet_data,
-                    'timestamp': time.time()
-                })
+                try:
+                    # GİRİŞ: Ham JSON Paketi (Şifreli olduğunun kanıtı)
+                    input_preview = packet.decode('utf-8', errors='ignore')
+                    
+                    self.operation_callback({
+                        'type': 'operation_start',
+                        'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
+                        'operation': 'DECRYPT', # Hibrit paketi çözme işlemi
+                        'algorithm': 'hybrid_packet', # Parse edilmeden önceki hali
+                        'key': '*** RSA Encrypted ***',
+                        'input_data': input_preview,
+                        'is_binary': False,
+                        'timestamp': time.time()
+                    })
+                except:
+                    pass
 
-            # Client'a "Alındı" bilgisi gönder (Sonuç değil!)
-            ack_metadata = {
-                'type': 'ACK',
-                'message': 'Paket server tarafından alındı, şifre çözümü bekleniyor.',
+            # 2. Paketi Otomatik ÇÖZ
+            result_dict = self.hybrid_decryption_manager.decrypt_message(packet, return_dict=True)
+            decrypted_message = result_dict['message']
+            algorithm = result_dict['algorithm']
+            symmetric_key = result_dict['key']
+
+            # 3. İşlem Bilgilerini GUI'ye bildir (MANUEL ÇÖZÜM İÇİN)
+            if self.operation_callback:
+                try:
+                    # Şifreli bileşenleri ayıkla
+                    packet_data = self.hybrid_decryption_manager.parse_hybrid_packet(packet)
+                    enc_msg_b64 = base64.b64encode(packet_data['encrypted_message']).decode('utf-8')
+                    enc_key_b64 = base64.b64encode(packet_data['encrypted_key']).decode('utf-8')
+                    key_type = packet_data.get('key_type', 'RSA')
+
+                    self.operation_callback({
+                        'type': 'operation_success',
+                        'client': client_socket.getpeername() if hasattr(client_socket, 'getpeername') else 'Unknown',
+                        'operation': 'HYBRID_MANUAL_FLOW', # Manuel akış tipi
+                        'algorithm': algorithm,
+                        'key_type': key_type,
+                        'input_data': packet.decode('utf-8', errors='ignore'),
+                        'encrypted_message': enc_msg_b64,
+                        'encrypted_key': enc_key_b64,
+                        'timestamp': time.time()
+                    })
+                except:
+                    pass
+
+            # 3. Client'a sonucu döndür (İstemci tarafında görünecek)
+            result_metadata = {
+                'type': 'RESULT',
+                'algorithm': algorithm,
+                'operation': 'HYBRID_DECRYPT',
                 'timestamp': time.time()
             }
-            ack_packet = DataPacket.create_packet(b"PACKET_RECEIVED", 'ACK', ack_metadata, use_json_format=WIRESHARK_MODE)
-            client_socket.sendall(ack_packet)
+            result_packet = DataPacket.create_packet(decrypted_message, 'RESULT', result_metadata, use_json_format=WIRESHARK_MODE)
+            client_socket.sendall(result_packet)
             
-            Logger.info("Hibrit paket alındı ve kuyruğa eklendi", "Server")
+            Logger.info(f"Hibrit paket başarıyla çözüldü: {algorithm}", "Server")
             
         except Exception as e:
             Logger.error(f"Hibrit paket işleme hatası: {str(e)}", "Server")
-            import traceback
-            Logger.debug(f"Detaylı hata: {traceback.format_exc()}", "Server")
             self._send_error(client_socket, f"Hibrit paket işleme hatası: {str(e)}")
 
     def decrypt_manual(self, packet_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -313,7 +368,7 @@ class Server:
                     try:
                         data_preview = data.decode('utf-8')
                     except:
-                        data_preview = data.hex()
+                        data_preview = base64.b64encode(data).decode('utf-8')
                         is_binary = True
 
                     # Metadata'dan dosya bilgilerini al
@@ -373,7 +428,7 @@ class Server:
                             try:
                                 result_preview = result_data.decode('utf-8')
                             except:
-                                result_preview = result_data.hex()
+                                result_preview = base64.b64encode(result_data).decode('utf-8')
                                 res_is_binary = True
 
                             # Metadata'dan dosya bilgilerini al

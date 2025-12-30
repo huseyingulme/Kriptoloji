@@ -53,6 +53,23 @@ class IronCipher(BaseCipher):
     @staticmethod
     def _derive_key(key: str) -> bytes:
         """Anahtarı 16 byte (128 bit) boyutuna türetir."""
+        if not key:
+            raise ValueError("Anahtar boş olamaz.")
+            
+        # 1. Base64 kontrolü: Eğer girdi base64 ise ve tam 16 byte ise direkt kullan
+        try:
+            import base64
+            decoded = base64.b64decode(key.encode('utf-8'), validate=True)
+            if len(decoded) == 16:
+                return decoded
+        except:
+            pass
+
+        # 2. Eğer 16 byte'lık ham bir string ise onu da direkt kullanabiliriz
+        if len(key) == 16:
+            return key.encode('utf-8')
+
+        # 3. Aksi takdirde SHA256 ile türet
         return hashlib.sha256(key.encode('utf-8')).digest()[:16]
 
     def _calculate_rounds(self, key_bytes: bytes) -> int:

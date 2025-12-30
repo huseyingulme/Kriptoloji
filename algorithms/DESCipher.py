@@ -5,6 +5,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding, hashes
 import os
 import hashlib
+from shared.utils import CryptoUtils
 
 class DESCipher(BaseCipher):
     """
@@ -64,8 +65,15 @@ class DESCipher(BaseCipher):
         if not key_string:
             raise ValueError("Anahtar boş olamaz.")
         
-        # SHA256 ile anahtar türetilir ve ilk 8 byte alınır.
-        key_hash = hashlib.sha256(key_string.encode()).digest()
+        # 1. Akıllı Anahtar Tespiti (Hex, B64, Raw)
+        derived_key = CryptoUtils.derive_key_robust(key_string, expected_sizes=[8])
+        
+        # Eğer zaten 8 bytes ise direkt döndür
+        if len(derived_key) == self.DES_KEY_DERIVE_SIZE:
+            return derived_key
+
+        # 2. Aksi takdirde SHA256 ile anahtar türetilir ve ilk 8 byte alınır.
+        key_hash = hashlib.sha256(derived_key).digest()
         des_key = key_hash[:self.DES_KEY_DERIVE_SIZE] 
         return des_key
 

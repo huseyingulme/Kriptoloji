@@ -64,6 +64,20 @@ class IDEACipher(BaseCipher):
         if not key_string:
             raise ValueError("Anahtar boş olamaz.")
         
+        # 1. Base64 kontrolü: Eğer girdi base64 ise ve tam 16 byte ise direkt kullan
+        try:
+            import base64
+            decoded = base64.b64decode(key_string.encode(), validate=True)
+            if len(decoded) == self.IDEA_KEY_SIZE:
+                return decoded
+        except:
+            pass
+
+        # 2. Eğer 16 byte'lık ham bir string ise onu da direkt kullanabiliriz
+        if len(key_string) == self.IDEA_KEY_SIZE:
+            return key_string.encode()
+
+        # 3. Aksi takdirde SHA256 ile anahtar türetilir ve ilk 16 byte alınır.
         key_hash = hashlib.sha256(key_string.encode()).digest()
         return key_hash[:self.IDEA_KEY_SIZE] 
 

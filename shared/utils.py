@@ -1,3 +1,8 @@
+"""
+DataPacket sınıfı, TCP tabanlı istemci–sunucu iletişiminde veri kaybını önlemek
+amacıyla paket oluşturma, alma, çözümleme ve büyük verileri parçalayıp birleştirme
+işlemlerini gerçekleştirir.
+"""
 import json
 import struct
 import hashlib
@@ -256,6 +261,77 @@ class DataPacket:
         parsed_chunks.sort(key=lambda x: x[0])
 
         return b''.join([chunk_data for _, chunk_data in parsed_chunks])
+
+class CryptoUtils:
+    """
+    Kriptografik yardımcı metodlar.
+    """
+    @staticmethod
+    def derive_key_robust(key: str, expected_sizes: List[int] = [8, 16, 24, 32]) -> bytes:
+        """
+        Gelişmiş ve akıllı anahtar türetme.
+        Base64, Hex ve Ham metin formatlarını otomatik tespit eder.
+        
+        Args:
+            key: Kullanıcının girdiği anahtar dizesi
+            expected_sizes: Hedeflenen anahtar boyutları (byte cinsinden)
+            
+        Returns:
+            bytes: Çözümlenmiş veya ham anahtar baytları
+        """
+        if not key:
+            return b""
+            
+        if isinstance(key, bytes):
+            if len(key) in expected_sizes:
+                return key
+            try:
+                key_str = key.decode('utf-8').strip()
+            except:
+                return key # Decode edilemiyorsa ham bytes olarak kalsın
+        else:
+            key_str = str(key).strip()
+
+        # 1. HEX KONTROLÜ (Örn: 32 karakterlik hex = 16 byte AES key)
+        if all(c in '0123456789abcdefABCDEF' for c in key_str) and len(key_str) > 0:
+            if len(key_str) % 2 == 0:
+                try:
+                    import binascii
+                    decoded = binascii.unhexlify(key_str)
+                    if len(decoded) in expected_sizes:
+                        return decoded
+                except:
+                    pass
+
+        # 2. BASE64 KONTROLÜ
+        # Not: B64 her zaman beklenen boyutlardan birine decode olmayabilir, 
+        # ama decode sonucu beklenen boyutlardaysa yüksek ihtimalle anahtardır.
+        try:
+            import base64
+            # Padding eksikse tamamla
+            b64_str = key_str
+            # Sadece geçerli B64 karakterleri içerdiğinden emin ol
+            b64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+            if all(c in b64_chars for c in b64_str):
+                missing_padding = len(b64_str) % 4
+                if missing_padding:
+                    b64_str += '=' * (4 - missing_padding)
+                
+                decoded = base64.b64decode(b64_str)
+                if len(decoded) in expected_sizes:
+                    return decoded
+        except:
+            pass
+            
+        # 3. HAM STRING KONTROLÜ (UTF-8)
+        # Eğer string hali zaten beklenen boyuttaysa (örn 16 karakter = 16 byte)
+        try:
+            raw_bytes = key_str.encode('utf-8')
+            if len(raw_bytes) in expected_sizes:
+                return raw_bytes
+            return raw_bytes # Değilse bile ham bytes olarak döndür (Cipher hashler)
+        except:
+            return key_str.encode('utf-8', errors='ignore')
 
 class FileUtils:
 

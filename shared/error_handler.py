@@ -1,3 +1,12 @@
+"""
+Bu dosya, uygulamada oluşabilecek hataların merkezi ve kontrollü şekilde
+yönetilmesini sağlar. Tekrar deneme (retry), zaman aşımı (timeout),
+kullanıcı dostu hata mesajları üretme ve otomatik yeniden bağlanma
+mekanizmalarını içerir.
+
+Amaç; sistemin kararlılığını artırmak, geçici hatalarda uygulamanın
+çökmesini önlemek ve tüm hataları detaylı şekilde loglamaktır.
+"""
 import time
 import functools
 from typing import Callable, Any, Optional, Dict

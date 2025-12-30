@@ -1,3 +1,11 @@
+"""
+Bu dosya, istemci–sunucu mimarisinde güvenli veri iletimi sağlamak amacıyla
+uygulama katmanı paketleme (packet framing), büyük veri parçalama (chunking),
+dosya türü ve bütünlük kontrolü ile temel loglama işlemlerini yönetir.
+
+Şifrelenmiş veya düz verilerin TCP üzerinden eksiksiz, sıralı ve analiz edilebilir
+şekilde aktarılmasını sağlar.
+"""
 import threading
 import queue
 import time

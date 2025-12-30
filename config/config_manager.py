@@ -29,13 +29,13 @@ class ConfigManager:
                 "host": os.getenv("KRIPTO_SERVER_HOST", "localhost"),
                 "port": int(os.getenv("KRIPTO_SERVER_PORT", "12345")),
                 "max_clients": int(os.getenv("KRIPTO_MAX_CLIENTS", "10")),
-                "timeout": int(os.getenv("KRIPTO_TIMEOUT", "30")),
+                "timeout": int(os.getenv("KRIPTO_TIMEOUT", "300")),
                 "enable_ssl": os.getenv("KRIPTO_ENABLE_SSL", "false").lower() == "true"
             },
             "client": {
                 "default_host": os.getenv("KRIPTO_CLIENT_HOST", "localhost"),
                 "default_port": int(os.getenv("KRIPTO_CLIENT_PORT", "12345")),
-                "connection_timeout": int(os.getenv("KRIPTO_CONN_TIMEOUT", "10")),
+                "connection_timeout": int(os.getenv("KRIPTO_CONN_TIMEOUT", "100")),
                 "retry_attempts": int(os.getenv("KRIPTO_RETRY_ATTEMPTS", "3")),
                 "retry_delay": float(os.getenv("KRIPTO_RETRY_DELAY", "1.0")),
                 "auto_reconnect": os.getenv("KRIPTO_AUTO_RECONNECT", "true").lower() == "true"

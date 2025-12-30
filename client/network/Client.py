@@ -207,7 +207,7 @@ class Client:
                 }
 
             # Başarı kontrolü
-            is_success = packet_type in ['RESULT', 'SUCCESS', 'PONG', 'PUBLIC_KEY'] and packet_type not in ['ERROR', 'FAILED']
+            is_success = packet_type in ['RESULT', 'SUCCESS', 'PONG', 'PUBLIC_KEY', 'ECC_PUBLIC_KEY', 'ACK'] and packet_type not in ['ERROR', 'FAILED']
             
             # Cevap oluştur
             response = {
@@ -359,8 +359,6 @@ class Client:
             _, packet_type, _ = DataPacket.receive_packet(self.socket, use_json_format=WIRESHARK_MODE)
             return packet_type == 'PONG'
 
-            return False
-
         except Exception as e:
             Logger.error(f"Ping hatası: {str(e)}", "Client")
             return False
@@ -393,8 +391,38 @@ class Client:
                 Logger.warning(f"Beklenmeyen paket tipi: {packet_type}", "Client")
                 return None
 
-            return None
-
         except Exception as e:
             Logger.error(f"Handshake hatası: {str(e)}", "Client")
+            return None
+
+    def request_ecc_public_key(self) -> Optional[bytes]:
+        """
+        Server'dan ECC public key talep eder.
+        
+        Returns:
+            bytes: ECC public key (PEM formatında) veya None
+        """
+        try:
+            if not self.connected:
+                if not self.connect():
+                    return None
+
+            # ECC Handshake paketi gönder
+            handshake_data = b"ECC_HANDSHAKE"
+            handshake_metadata = {'type': 'ECC_HANDSHAKE', 'timestamp': time.time()}
+            packet = DataPacket.create_packet(handshake_data, 'ECC_HANDSHAKE', handshake_metadata, use_json_format=WIRESHARK_MODE)
+
+            self.socket.sendall(packet)
+
+            # Public key cevabı bekle
+            data, packet_type, metadata = DataPacket.receive_packet(self.socket, use_json_format=WIRESHARK_MODE)
+            if packet_type == 'ECC_PUBLIC_KEY':
+                Logger.info("ECC public key alındı", "Client")
+                return data
+            else:
+                Logger.warning(f"Beklenmeyen paket tipi: {packet_type}", "Client")
+                return None
+
+        except Exception as e:
+            Logger.error(f"ECC Handshake hatası: {str(e)}", "Client")
             return None
